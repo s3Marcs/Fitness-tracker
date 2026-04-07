@@ -42,8 +42,8 @@ async def create_workout(workout: dict):
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.post("https://api.notion.com/v1/databases/5b69a72d028e406eb91e330519729213/query", headers=headers, json=data)
-        if response.status_code == 201:
+        response = await client.post("https://api.notion.com/v1/pages", headers=headers, json=data)
+        if response.status_code == 200:
             return response.json()
         else:
             raise HTTPException(status_code=response.status_code, detail="Failed to create workout")

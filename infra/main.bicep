@@ -108,6 +108,12 @@ resource frontendContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' =
 resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' = {
   name: 'ca-api'
   location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentity.id}': {}
+    }
+  }
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
@@ -128,6 +134,18 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' = {
           image: '${acr.loginServer}/fitness-tracker-api:latest'
         }
       ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 5
+      }
+      identity: {
+        type: 'UserAssigned'
+        userAssignedIdentities: [
+          {
+            resourceId: managedIdentity.id
+          }
+        ]
+      }
     }
   }
 }
