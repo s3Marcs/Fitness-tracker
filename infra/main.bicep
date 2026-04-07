@@ -57,12 +57,6 @@ resource caddyContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' = {
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
-      secrets: [
-        {
-          name: 'NOTION_API_KEY'
-          value: notionApiKeySecret.properties.value
-        }
-      ]
       ingress: {
         external: true
         targetPort: 80
@@ -78,12 +72,6 @@ resource caddyContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' = {
         {
           name: 'caddy'
           image: 'caddy:latest'
-          env: [
-            {
-              name: 'NOTION_API_KEY'
-              secretRef: 'NOTION_API_KEY'
-            }
-          ]
         }
       ]
     }
@@ -96,14 +84,8 @@ resource frontendContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' =
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
-      secrets: [
-        {
-          name: 'NOTION_API_KEY'
-          value: notionApiKeySecret.properties.value
-        }
-      ]
       ingress: {
-        external: true
+        external: false
         targetPort: 3000
         traffic: [
           {
@@ -117,12 +99,6 @@ resource frontendContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' =
         {
           name: 'frontend'
           image: '${acr.loginServer}/fitness-tracker-frontend:latest'
-          env: [
-            {
-              name: 'NOTION_API_KEY'
-              secretRef: 'NOTION_API_KEY'
-            }
-          ]
         }
       ]
     }
@@ -135,14 +111,8 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' = {
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
-      secrets: [
-        {
-          name: 'NOTION_API_KEY'
-          value: notionApiKeySecret.properties.value
-        }
-      ]
       ingress: {
-        external: true
+        external: false
         targetPort: 8000
         traffic: [
           {
@@ -156,12 +126,6 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01-preview' = {
         {
           name: 'api'
           image: '${acr.loginServer}/fitness-tracker-api:latest'
-          env: [
-            {
-              name: 'NOTION_API_KEY'
-              secretRef: 'NOTION_API_KEY'
-            }
-          ]
         }
       ]
     }

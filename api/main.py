@@ -4,20 +4,17 @@ import httpx
 
 app = FastAPI()
 
-NOTION_API_KEY = os.getenv("NOTION_API_KEY")
-NOTION_DATABASE_ID = "5b69a72d028e406eb91e330519729213"
-NOTION_URL = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/pages"
-
-headers = {
-    "Authorization": f"Bearer {NOTION_API_KEY}",
-    "Content-Type": "application/json",
-    "Notion-Version": "2022-06-28"
-}
 
 @app.get("/api/workouts")
 async def get_workouts():
+    NOTION_API_KEY = os.getenv("NOTION_API_KEY")
+    headers = {
+        "Authorization": f"Bearer {NOTION_API_KEY}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28"
+    }
     async with httpx.AsyncClient() as client:
-        response = await client.post(NOTION_URL, headers=headers)
+        response = await client.post("https://api.notion.com/v1/databases/5b69a72d028e406eb91e330519729213/query", headers=headers, json={})
         if response.status_code == 200:
             return response.json()
         else:
@@ -25,6 +22,12 @@ async def get_workouts():
 
 @app.post("/api/workouts")
 async def create_workout(workout: dict):
+    NOTION_API_KEY = os.getenv("NOTION_API_KEY")
+    headers = {
+        "Authorization": f"Bearer {NOTION_API_KEY}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28"
+    }
     data = {
         "properties": {
             "Exercise": {"title": [{"text": {"content": workout.get("exercise", "")}}]},
@@ -39,7 +42,7 @@ async def create_workout(workout: dict):
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(NOTION_URL, headers=headers, json=data)
+        response = await client.post("https://api.notion.com/v1/databases/5b69a72d028e406eb91e330519729213/query", headers=headers, json=data)
         if response.status_code == 201:
             return response.json()
         else:

@@ -7,6 +7,11 @@ services:
       - "80:80"
     volumes:
       - ./proxy/Caddyfile:/etc/caddy/Caddyfile
+    networks:
+      - app-network
+    depends_on:
+      - frontend
+      - api
 
   frontend:
     build:
@@ -14,6 +19,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    networks:
+      - app-network
 
   api:
     build:
@@ -23,3 +30,9 @@ services:
       - "8000:8000"
     environment:
       NOTION_API_KEY: ${NOTION_API_KEY}
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
