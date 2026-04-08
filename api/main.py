@@ -23,9 +23,17 @@ class ExerciseEntry(BaseModel):
     weight_kg: float
     notes: str
 
+class ExerciseInput(BaseModel):
+    exercise: str
+    muscle_group: str
+    sets: int
+    reps: int
+    weight_kg: float
+    notes: str = ""
+
 class SessionPayload(BaseModel):
     date: str = Field(..., description="Date of the session in YYYY-MM-DD format")
-    exercises: list[WorkoutEntry] = Field(..., description="List of exercises for the session")
+    exercises: list[ExerciseInput] = Field(..., description="List of exercises for the session")
 
 app = FastAPI()
 
