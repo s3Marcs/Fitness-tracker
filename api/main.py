@@ -5,17 +5,7 @@ import httpx
 from pydantic import BaseModel, Field
 import asyncio
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 
-class WorkoutEntry(BaseModel):
-    exercise: str
-    date: str
-    day: str
-    muscle_group: str
-    sets: int
-    reps: int
-    weight_kg: float
-    notes: str = ""
 
 class SessionSummary(BaseModel):
     date: str
@@ -67,16 +57,16 @@ def notion_headers():
         "Notion-Version": "2022-06-28"
     }
 
-def build_properties(workout: WorkoutEntry):
+def build_properties(exercise: ExerciseInput, date: str, day: str):
     return {
-        "Exercise": {"title": [{"text": {"content": workout.exercise}}]},
-        "Date": {"date": {"start": workout.date, "end": None}},
-        "Day": {"select": {"name": workout.day}},
-        "Muscle Group": {"select": {"name": workout.muscle_group}},
-        "Sets": {"number": workout.sets},
-        "Reps": {"number": workout.reps},
-        "Weight (kg)": {"number": workout.weight_kg},
-        "Notes": {"rich_text": [{"text": {"content": workout.notes}}] if workout.notes else []}
+        "Exercise": {"title": [{"text": {"content": exercise.exercise}}]},
+        "Date": {"date": {"start": date, "end": None}},
+        "Day": {"select": {"name": day}},
+        "Muscle Group": {"select": {"name": exercise.muscle_group}},
+        "Sets": {"number": exercise.sets},
+        "Reps": {"number": exercise.reps},
+        "Weight (kg)": {"number": exercise.weight_kg},
+        "Notes": {"rich_text": [{"text": {"content": exercise.notes}}] if exercise.notes else []}
     }
 
 async def notion_request(method, url, data=None):
@@ -103,13 +93,13 @@ async def get_workout(page_id: str):
 @app.post("/api/workouts", status_code=201)
 async def create_workout(workout: WorkoutEntry):
     url = "https://api.notion.com/v1/pages"
-    data = {"parent": {"database_id": NOTION_DATABASE_ID}, "properties": build_properties(workout)}
+    data = {"parent": {"database_id": NOTION_DATABASE_ID}, "properties": build_properties(workout, workout.date, workout.day)}
     return await notion_request("POST", url, data)
 
 @app.patch("/api/workouts/{page_id}")
 async def update_workout(page_id: str, workout: WorkoutEntry):
     url = f"https://api.notion.com/v1/pages/{page_id}"
-    data = {"properties": build_properties(workout)}
+    data = {"properties": build_properties(workout, workout.date, workout.day)}
     return await notion_request("PATCH", url, data)
 
 @app.delete("/api/workouts/{page_id}", status_code=204)
@@ -126,7 +116,7 @@ async def get_sessions():
     next_cursor = None
 
     while has_more:
-        params = {"page_size": 100}
+        params = {"page_size": 100, "sorts": [{"property": "Date", "direction": "descending"}]}
         if next_cursor:
             params["start_cursor"] = next_cursor
         response = await notion_request("POST", url, data=params)
@@ -202,13 +192,13 @@ async def get_session(date: str):
 @app.post("/api/sessions", status_code=201)
 async def create_session(session: SessionPayload):
     url = "https://api.notion.com/v1/pages"
+    day_of_week = datetime.strptime(session.date, "%Y-%m-%d").strftime("%A")
     tasks = []
 
     for exercise in session.exercises:
-        day_of_week = datetime.strptime(session.date, "%Y-%m-%d").strftime("%A")
         data = {
             "parent": {"database_id": NOTION_DATABASE_ID},
-            "properties": build_properties(exercise.copy(update={"date": session.date, "day": day_of_week}))
+            "properties": build_properties(exercise, session.date, day_of_week)
         }
         tasks.append(notion_request("POST", url, data=data))
 
