@@ -187,27 +187,6 @@ async def add_routine_exercise(routine_id: str, payload: RoutineExerciseInput):
 
 # --- Schedule ---
 
-@app.get("/api/schedule")
-async def get_schedule():
-    results = await query_db(NOTION_SCHEDULE_DB, {"sorts": [{"property": "Scheduled Date", "direction": "ascending"}]})
-    items = []
-    for r in results:
-        props = r["properties"]
-        name = props["Name"]["title"][0]["plain_text"] if props["Name"]["title"] else ""
-        status = props["Status"]["select"]["name"] if props["Status"]["select"] else ""
-        scheduled_date = props["Scheduled Date"]["date"]["start"] if props["Scheduled Date"]["date"] else None
-        logged_date = props["Logged Date"]["date"]["start"] if props["Logged Date"]["date"] else None
-        routine_relations = props["Routine"]["relation"]
-        routine_id = routine_relations[0]["id"] if routine_relations else None
-        items.append({
-            "id": r["id"],
-            "name": name,
-            "routine_id": routine_id,
-            "scheduled_date": scheduled_date,
-            "logged_date": logged_date,
-            "status": status
-        })
-    return items
 
 @app.get("/api/schedule/today")
 async def get_todays_schedule():
@@ -233,6 +212,28 @@ async def get_todays_schedule():
         "scheduled_date": today,
         "status": props["Status"]["select"]["name"]
     }
+    
+@app.get("/api/schedule")
+async def get_schedule():
+    results = await query_db(NOTION_SCHEDULE_DB, {"sorts": [{"property": "Scheduled Date", "direction": "ascending"}]})
+    items = []
+    for r in results:
+        props = r["properties"]
+        name = props["Name"]["title"][0]["plain_text"] if props["Name"]["title"] else ""
+        status = props["Status"]["select"]["name"] if props["Status"]["select"] else ""
+        scheduled_date = props["Scheduled Date"]["date"]["start"] if props["Scheduled Date"]["date"] else None
+        logged_date = props["Logged Date"]["date"]["start"] if props["Logged Date"]["date"] else None
+        routine_relations = props["Routine"]["relation"]
+        routine_id = routine_relations[0]["id"] if routine_relations else None
+        items.append({
+            "id": r["id"],
+            "name": name,
+            "routine_id": routine_id,
+            "scheduled_date": scheduled_date,
+            "logged_date": logged_date,
+            "status": status
+        })
+    return items
 
 @app.post("/api/schedule", status_code=201)
 async def create_schedule_entries(payload: dict):
