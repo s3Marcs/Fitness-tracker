@@ -62,7 +62,6 @@ export default function LogPage() {
     }));
   };
 
-  const addRow = () => setRows(prev => [...prev, blankRow(exercises.find(e => e.id === prev[0].exercise_id))]);
   const removeRow = (i) => setRows(prev => prev.filter((_, idx) => idx !== i));
 
   const totalVolume = rows.reduce((sum, r) => {
