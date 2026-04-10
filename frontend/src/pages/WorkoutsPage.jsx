@@ -1,46 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 /*
  * WorkoutsPage
  *
- * Props (all optional — renders stub data when not provided):
- *   workout      {object|null}  - active workout session
- *                                 { name, exercises: [{ id, name, sets: [{ weight, reps, done }] }] }
- *   onFinish     {function}     - called when workout is finished
- *   onCancel     {function}     - called when workout is cancelled
+ * On mount fetches today's scheduled workout:
+ *   1. GET /api/schedule/today → { id, routine_id, scheduled_date, status } | null
+ *   2. GET /api/programs/{routine_id}/exercises → [{ id, name, default_sets, order }]
  *
- * Wiring target:
- *   workout      <- GET /api/schedule/today + GET /api/routines/{id}/exercises
- *   onFinish     -> POST /api/workouts
- *   onCancel     -> no-op / navigate back
+ * If nothing is scheduled today, shows a "no workout" state.
+ * onFinish -> POST /api/sessions (not yet wired — placeholder)
  */
-
-const STUB_WORKOUT = {
-  name: 'Hypertrophy A Pull',
-  exercises: [
-    {
-      id: '1',
-      name: 'Barbell Row',
-      tag: 'Main Lift',
-      sets: [
-        { weight: 80, reps: 12, done: true },
-        { weight: 80, reps: 12, done: true },
-        { weight: 80, reps: 12, done: false },
-        { weight: 80, reps: 12, done: false },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Lat Pulldown',
-      tag: 'Accessory',
-      sets: [
-        { weight: 0, reps: 0, done: false },
-        { weight: 0, reps: 0, done: false },
-        { weight: 0, reps: 0, done: false },
-      ],
-    },
-  ],
-};
 
 function SetRow({ set, setIndex, onUpdate }) {
   return (
@@ -139,30 +108,62 @@ function ExerciseBlock({ exercise, onUpdateSet }) {
   );
 }
 
-export default function WorkoutsPage({
-  workout = STUB_WORKOUT,
-  onFinish,
-  onCancel,
-}) {
-  const [exercises, setExercises] = useState(
-    workout?.exercises ?? STUB_WORKOUT.exercises
-  );
+// ---------------------------------------------------------------------------
+// Shape helper — maps API exercise to WorkoutsPage exercise shape
+// API: { id, name, default_sets, exercise_id, order }
+// ---------------------------------------------------------------------------
+function apiExerciseToWorkoutExercise(ex, index) {
+  return {
+    id: ex.id,
+    name: ex.name,
+    tag: index === 0 ? 'Main Lift' : 'Accessory',
+    sets: Array.from({ length: ex.default_sets || 3 }, () => ({
+      weight: 0,
+      reps: 0,
+      done: false,
+    })),
+  };
+}
 
-  const workoutName = workout?.name ?? STUB_WORKOUT.name;
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
-  const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
-  const doneSets = exercises.reduce(
-    (acc, ex) => acc + ex.sets.filter((s) => s.done).length,
-    0
-  );
-  const totalVolume = exercises.reduce(
-    (acc, ex) =>
-      acc +
-      ex.sets
-        .filter((s) => s.done)
-        .reduce((a, s) => a + s.weight * s.reps, 0),
-    0
-  );
+export default function WorkoutsPage() {
+  const [loading, setLoading] = useState(true);
+  const [workoutName, setWorkoutName] = useState(null);
+  const [exercises, setExercises] = useState([]);
+  const [scheduleId, setScheduleId] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/schedule/today')
+      .then((r) => r.json())
+      .then((schedule) => {
+        if (!schedule || !schedule.routine_id) {
+          setLoading(false);
+          return;
+        }
+        setScheduleId(schedule.id);
+        return fetch(`/api/programs/${schedule.routine_id}/exercises`)
+          .then((r) => r.json())
+          .then((exList) => {
+            // Also fetch program name for the header
+            return fetch(`/api/programs`)
+              .then((r) => r.json())
+              .then((programs) => {
+                const program = programs.find((p) => p.id === schedule.routine_id);
+                setWorkoutName(program?.name ?? 'Today\'s Workout');
+                setExercises(
+                  Array.isArray(exList)
+                    ? exList.map((ex, i) => apiExerciseToWorkoutExercise(ex, i))
+                    : []
+                );
+              });
+          });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   function handleUpdateSet(exerciseId, setIndex, field, value) {
     setExercises((prev) =>
@@ -179,6 +180,55 @@ export default function WorkoutsPage({
     );
   }
 
+  const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
+  const doneSets = exercises.reduce(
+    (acc, ex) => acc + ex.sets.filter((s) => s.done).length,
+    0
+  );
+  const totalVolume = exercises.reduce(
+    (acc, ex) =>
+      acc + ex.sets.filter((s) => s.done).reduce((a, s) => a + s.weight * s.reps, 0),
+    0
+  );
+
+  // --- Loading state ---
+  if (loading) {
+    return (
+      <main
+        className="pb-24 px-4 max-w-7xl mx-auto"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}
+      >
+        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">
+          WORKOUTS
+        </h1>
+        <p className="text-on-surface-variant text-sm font-body">Loading...</p>
+      </main>
+    );
+  }
+
+  // --- No workout scheduled ---
+  if (!workoutName) {
+    return (
+      <main
+        className="pb-24 px-4 max-w-7xl mx-auto"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}
+      >
+        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">
+          WORKOUTS
+        </h1>
+        <div className="bg-surface-container-low p-4">
+          <p className="text-[10px] text-primary font-bold tracking-tighter uppercase font-headline mb-1">
+            Today
+          </p>
+          <p className="text-on-surface-variant text-sm font-body">
+            No workout scheduled for today.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // --- Active workout ---
   return (
     <main
       className="pb-24 px-4 max-w-7xl mx-auto"
@@ -228,6 +278,11 @@ export default function WorkoutsPage({
       </div>
 
       {/* Exercise blocks */}
+      {exercises.length === 0 && (
+        <p className="text-on-surface-variant text-sm font-body">
+          No exercises in this program yet.
+        </p>
+      )}
       {exercises.map((exercise) => (
         <ExerciseBlock
           key={exercise.id}
@@ -237,26 +292,31 @@ export default function WorkoutsPage({
       ))}
 
       {/* Finish / Cancel */}
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <button
-          onClick={() => onFinish?.({ exercises, totalVolume })}
-          className="bg-primary py-3 flex items-center justify-center gap-2 hover:bg-primary-container transition-colors"
-        >
-          <span className="text-on-primary text-sm font-black tracking-[0.2em] font-headline uppercase">
-            Finish
-          </span>
-          <span className="material-symbols-outlined text-on-primary text-sm">check_circle</span>
-        </button>
-        <button
-          onClick={() => onCancel?.()}
-          className="border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors"
-        >
-          <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">
-            Cancel
-          </span>
-          <span className="material-symbols-outlined text-on-surface-variant text-sm">close</span>
-        </button>
-      </div>
+      {exercises.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <button
+            onClick={() => {
+              /* TODO: POST /api/sessions */
+              alert('Session logging not yet wired.');
+            }}
+            className="bg-primary py-3 flex items-center justify-center gap-2 hover:bg-primary-container transition-colors"
+          >
+            <span className="text-on-primary text-sm font-black tracking-[0.2em] font-headline uppercase">
+              Finish
+            </span>
+            <span className="material-symbols-outlined text-on-primary text-sm">check_circle</span>
+          </button>
+          <button
+            onClick={() => window.history.back()}
+            className="border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors"
+          >
+            <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">
+              Cancel
+            </span>
+            <span className="material-symbols-outlined text-on-surface-variant text-sm">close</span>
+          </button>
+        </div>
+      )}
     </main>
   );
 }

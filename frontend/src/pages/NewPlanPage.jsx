@@ -1,51 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /*
  * NewPlanPage
  *
- * Props (all optional — renders stub data when not provided):
- *   programs   {array}     - [{ id, name }] — populates program dropdown
- *   onSave     {function}  - called with { name, programId, days }
- *
- * Wiring targets:
- *   programs  <- GET /api/routines/programs
- *   onSave    -> POST /api/routines
+ * Endpoints:
+ *   programs  <- GET /api/programs → [{ id, name }]
+ *   onSave    -> POST /api/plans   ← { name, program_id, day }
  */
-
-const STUB_PROGRAMS = [
-  { id: '1', name: 'Upper Body' },
-  { id: '2', name: 'Lower Body' },
-  { id: '3', name: 'Full Body' },
-  { id: '4', name: 'Pull' },
-  { id: '5', name: 'Push' },
-];
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function NewPlanPage({
-  programs = STUB_PROGRAMS,
-  onSave,
-}) {
+export default function NewPlanPage() {
   const navigate = useNavigate();
+  const [programs, setPrograms] = useState([]);
   const [planName, setPlanName] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
-  const [selectedDays, setSelectedDays] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(null); // single day index
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/programs')
+      .then((r) => r.json())
+      .then((data) => setPrograms(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   function toggleDay(index) {
-    setSelectedDays((prev) =>
-      prev.includes(index) ? prev.filter((d) => d !== index) : [...prev, index]
-    );
+    setSelectedDay((prev) => (prev === index ? null : index));
   }
 
-  function handleSave() {
-    if (!planName.trim() || !selectedProgram) return;
-    onSave?.({ name: planName, programId: selectedProgram, days: selectedDays });
-    navigate('/plans');
+  async function handleSave() {
+    if (!planName.trim() || !selectedProgram || selectedDay === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: planName.trim(),
+          program_id: selectedProgram,
+          day: DAY_FULL[selectedDay],
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      navigate('/plans');
+    } catch (e) {
+      setError('Failed to save plan. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const canSave = planName.trim().length > 0 && selectedProgram !== '';
+  const canSave =
+    planName.trim().length > 0 && selectedProgram !== '' && selectedDay !== null;
 
   return (
     <main
@@ -80,6 +92,11 @@ export default function NewPlanPage({
         <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
           Select Program
         </p>
+        {programs.length === 0 && (
+          <p className="text-on-surface-variant text-sm font-body">
+            No programs yet. Create a program first.
+          </p>
+        )}
         <div className="flex flex-col gap-1">
           {programs.map((prog) => (
             <button
@@ -106,7 +123,7 @@ export default function NewPlanPage({
         </div>
       </div>
 
-      {/* Select day */}
+      {/* Select day — single selection */}
       <div className="bg-surface-container-low p-4 mb-6">
         <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
           Select Day
@@ -117,7 +134,7 @@ export default function NewPlanPage({
               key={i}
               onClick={() => toggleDay(i)}
               className={`flex-1 py-2 text-xs font-black font-headline uppercase tracking-tight transition-colors ${
-                selectedDays.includes(i)
+                selectedDay === i
                   ? 'bg-primary text-on-primary'
                   : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
               }`}
@@ -126,31 +143,35 @@ export default function NewPlanPage({
             </button>
           ))}
         </div>
-        {selectedDays.length > 0 && (
+        {selectedDay !== null && (
           <p className="text-[9px] text-on-surface-variant uppercase font-headline mt-2">
-            {selectedDays.map((d) => DAY_LABELS[d]).join(', ')}
+            {DAY_LABELS[selectedDay]}
           </p>
         )}
       </div>
 
+      {error && (
+        <p className="text-red-400 text-sm font-body mb-4">{error}</p>
+      )}
+
       {/* Save */}
       <button
         onClick={handleSave}
-        disabled={!canSave}
+        disabled={!canSave || saving}
         className={`w-full py-3 flex items-center justify-center gap-2 transition-colors ${
-          canSave
+          canSave && !saving
             ? 'bg-primary hover:bg-primary-container'
             : 'bg-surface-container-highest cursor-not-allowed'
         }`}
       >
         <span
           className={`text-sm font-black tracking-[0.2em] font-headline uppercase ${
-            canSave ? 'text-on-primary' : 'text-on-surface-variant'
+            canSave && !saving ? 'text-on-primary' : 'text-on-surface-variant'
           }`}
         >
-          Save Plan
+          {saving ? 'Saving...' : 'Save Plan'}
         </span>
-        {canSave && (
+        {canSave && !saving && (
           <span className="material-symbols-outlined text-on-primary text-sm">check</span>
         )}
       </button>

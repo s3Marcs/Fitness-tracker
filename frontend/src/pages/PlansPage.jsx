@@ -1,79 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 /*
  * PlansPage
  *
- * Two sub-tabs: PLANS and PROGRAMS
+ * All data is self-fetched. No props required.
  *
- * Props (all optional — renders stub data when not provided):
- *   plans      {array}  - [{ id, name, muscleGroup, program, sets }]
- *   programs   {array}  - [{ id, name, exercises: [{ name }] }]
- *   onAddPlan  {fn}     - navigate to new plan form
- *   onAddProg  {fn}     - navigate to new program form
- *
- * Wiring targets:
- *   plans    <- GET /api/routines
- *   programs <- GET /api/routines/programs (or equivalent)
+ * Endpoints:
+ *   plans    <- GET /api/plans    → [{ id, name, day, program_id }]
+ *   programs <- GET /api/programs → [{ id, name }]
  */
-
-const STUB_PLANS = [
-  {
-    id: '1',
-    name: 'Upper Body',
-    muscleGroup: 'STRENGTH',
-    program: 'Upper Body',
-    sets: '3 SETS × 5-6 REPS',
-    sets2: '3 SETS × 5-6 REPS',
-  },
-  {
-    id: '2',
-    name: 'Lower Body',
-    muscleGroup: 'STRENGTH',
-    program: 'Lower Body',
-    sets: '3 SETS × 5-6 REPS',
-    sets2: '3 SETS × 8-10 REPS',
-  },
-];
-
-const STUB_PROGRAMS = [
-  {
-    id: '1',
-    name: 'Upper Body',
-    exercises: [
-      { name: 'Bench Press' },
-      { name: 'Overhead Press' },
-      { name: 'Lateral Raises' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Legs',
-    exercises: [
-      { name: 'Squat' },
-      { name: 'Leg Press' },
-      { name: 'Calf Raises' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Pull',
-    exercises: [
-      { name: 'Deadlift' },
-      { name: 'Pull Ups' },
-    ],
-  },
-];
 
 const TABS = ['PLANS', 'PROGRAMS'];
 
-function PlanCard({ plan }) {
+function PlanCard({ plan, programName }) {
   return (
     <div className="bg-surface-container-low p-4 mb-3">
       <div className="flex justify-between items-start mb-3">
         <div>
           <span className="bg-surface-container-highest text-secondary text-[9px] font-bold px-1.5 py-0.5 uppercase mb-2 inline-block font-headline">
-            {plan.muscleGroup}
+            {plan.day || 'NO DAY SET'}
           </span>
           <h3 className="text-lg font-black text-white uppercase font-headline tracking-tight">
             {plan.name}
@@ -89,21 +35,13 @@ function PlanCard({ plan }) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-surface-container p-2">
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
-            Program
-          </p>
-          <p className="text-xs text-white font-bold font-body">{plan.program}</p>
-          <p className="text-[9px] text-on-surface-variant font-body mt-0.5">{plan.sets}</p>
-        </div>
-        <div className="bg-surface-container p-2">
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
-            Volume
-          </p>
-          <p className="text-xs text-white font-bold font-body">{plan.program}</p>
-          <p className="text-[9px] text-on-surface-variant font-body mt-0.5">{plan.sets2}</p>
-        </div>
+      <div className="bg-surface-container p-2">
+        <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
+          Program
+        </p>
+        <p className="text-xs text-white font-bold font-body">
+          {programName || '—'}
+        </p>
       </div>
     </div>
   );
@@ -112,7 +50,7 @@ function PlanCard({ plan }) {
 function ProgramCard({ program }) {
   return (
     <div className="bg-surface-container-low p-4 mb-3">
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center">
         <h3 className="text-base font-black text-white uppercase font-headline tracking-tight">
           {program.name}
         </h3>
@@ -125,24 +63,32 @@ function ProgramCard({ program }) {
           </span>
         </Link>
       </div>
-      <div className="flex flex-col gap-1">
-        {program.exercises.map((ex, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className="w-1 h-1 bg-secondary" />
-            <span className="text-xs text-on-surface-variant font-body">{ex.name}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-export default function PlansPage({
-  plans = STUB_PLANS,
-  programs = STUB_PROGRAMS,
-}) {
+export default function PlansPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('PLANS');
+  const [plans, setPlans] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/plans').then((r) => r.json()),
+      fetch('/api/programs').then((r) => r.json()),
+    ])
+      .then(([plansData, programsData]) => {
+        setPlans(Array.isArray(plansData) ? plansData : []);
+        setPrograms(Array.isArray(programsData) ? programsData : []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Build a lookup map for program names
+  const programMap = Object.fromEntries(programs.map((p) => [p.id, p.name]));
 
   return (
     <main
@@ -173,11 +119,18 @@ export default function PlansPage({
         ))}
       </div>
 
+      {loading && (
+        <p className="text-on-surface-variant text-sm font-body">Loading...</p>
+      )}
+
       {/* Plans tab */}
-      {activeTab === 'PLANS' && (
+      {!loading && activeTab === 'PLANS' && (
         <>
+          {plans.length === 0 && (
+            <p className="text-on-surface-variant text-sm font-body mb-4">No plans yet.</p>
+          )}
           {plans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} />
+            <PlanCard key={plan.id} plan={plan} programName={programMap[plan.program_id]} />
           ))}
 
           <button
@@ -193,8 +146,11 @@ export default function PlansPage({
       )}
 
       {/* Programs tab */}
-      {activeTab === 'PROGRAMS' && (
+      {!loading && activeTab === 'PROGRAMS' && (
         <>
+          {programs.length === 0 && (
+            <p className="text-on-surface-variant text-sm font-body mb-4">No programs yet.</p>
+          )}
           {programs.map((program) => (
             <ProgramCard key={program.id} program={program} />
           ))}

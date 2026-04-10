@@ -4,7 +4,7 @@ import os
 import httpx
 from pydantic import BaseModel, Field
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class ExerciseInput(BaseModel):
@@ -313,7 +313,7 @@ async def get_progress():
     recent_volume_by_week = sorted_volume_by_week[-8:]
     formatted_volume_by_week = [
         {"week": datetime.fromisocalendar(year, week, 1).strftime("%b %d"), "value": value}
-        for (_, week), value in recent_volume_by_week
+        for (year, week), value in recent_volume_by_week
     ]
     
     # Sort and limit PRs to the top 5 exercises by max weight
@@ -327,8 +327,29 @@ async def get_progress():
 
 @app.get("/api/workouts/week-summary")
 async def get_week_summary():
-    url = f"https://api.notion.com/v1/databases/{NOTION_WORKOUT_DB}/query"
-    return await notion_request("POST", url)
+    from datetime import timedelta
+    today = datetime.utcnow().date()
+    days = [today - timedelta(days=(6 - i)) for i in range(7)]
+    day_labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+    start_str = days[0].strftime("%Y-%m-%d")
+    filter_data = {"filter": {"property": "Date", "date": {"on_or_after": start_str}}}
+    results = await query_db(NOTION_WORKOUT_DB, filter_data)
+    volumes = {d.strftime("%Y-%m-%d"): 0.0 for d in days}
+    for workout in results:
+        props = workout["properties"]
+        date_str = props["Date"]["date"]["start"].split('T')[0]
+        if date_str not in volumes:
+            continue
+        sets = props["Sets"]["number"] or 0
+        reps = props["Reps"]["number"] or 0
+        weight_kg = props["Weight (kg)"]["number"] or 0.0
+        volumes[date_str] += sets * reps * weight_kg
+    raw = [volumes[d.strftime("%Y-%m-%d")] for d in days]
+    max_vol = max(raw) if max(raw) > 0 else 1
+    return [
+        {"day": day_labels[d.weekday()], "value": int(round((raw[i] / max_vol) * 100))}
+        for i, d in enumerate(days)
+    ]
 
 @app.get("/api/workouts/{page_id}")
 async def get_workout(page_id: str):

@@ -5,103 +5,75 @@ import { fetchSessions } from '../hooks/useSessions';
 /*
  * HomePage
  *
- * Props (all optional — renders stub data when not provided):
- *   nextWorkout  {object|null}  - { name, time, date, durationMin }
- *   recentLogs   {array}        - [{ id, tag, name, date, durationMin, totalVolumeKg, avgHrBpm, exercises }]
- *   weekActivity {array}        - 7 items [{ day: 'M', value: 0-100 }], index 6 = today
- *   activityLogs {array}        - [{ id, tag, name, date, durationMin, totalVolumeKg, exercises }]
- *   progressData {object}       - { totalVolume, volumeByWeek: [{ week, value }], prs: [{ name, value, date }] }
+ * All data is self-fetched. No props required.
  *
- * Wiring targets:
- *   nextWorkout  <- GET /api/schedule/today
- *   recentLogs   <- GET /api/workouts?limit=3
+ * Endpoints:
+ *   nextWorkout  <- GET /api/schedule/today (returns null if nothing scheduled)
+ *   recentLogs   <- GET /api/sessions (first 3)
+ *   activityLogs <- GET /api/sessions (all)
  *   weekActivity <- GET /api/workouts/week-summary
- *   activityLogs <- GET /api/workouts?limit=20
  *   progressData <- GET /api/workouts/progress
  */
 
-const STUB_NEXT_WORKOUT = {
-  name: 'Upper Body Power',
-  time: '17:30',
-  date: 'OCT 24',
-  durationMin: 60,
-};
-
-const STUB_RECENT_LOGS = [
-  {
-    id: '1',
-    tag: 'STRENGTH',
-    name: 'Leg Day',
-    date: 'April 9, 2024',
-    durationMin: 75,
-    totalVolumeKg: 14200,
-    avgHrBpm: 142,
-    exercises: 'Squat, Lunges, Calf Raises...',
-  },
-  {
-    id: '2',
-    tag: 'CARDIO',
-    name: 'Morning Run',
-    date: 'April 8, 2024',
-    durationMin: 45,
-    totalVolumeKg: 0,
-    avgHrBpm: 158,
-    exercises: '8km steady state',
-  },
-];
+// ---------------------------------------------------------------------------
+// Stub data (shown while loading or on fetch error)
+// ---------------------------------------------------------------------------
 
 const STUB_WEEK_ACTIVITY = [
-  { day: 'M', value: 40 },
-  { day: 'T', value: 65 },
-  { day: 'W', value: 35 },
-  { day: 'T', value: 85 },
-  { day: 'F', value: 45 },
-  { day: 'S', value: 55 },
-  { day: 'S', value: 95 },
-];
-
-const STUB_ACTIVITY_LOGS = [
-  {
-    id: '1', tag: 'STRENGTH', name: 'Leg Day',
-    date: 'Apr 9', durationMin: 75, totalVolumeKg: 14200,
-    exercises: 'Squat, Lunges, Calf Raises...',
-  },
-  {
-    id: '2', tag: 'CARDIO', name: 'Morning Run',
-    date: 'Apr 8', durationMin: 45, totalVolumeKg: 0,
-    exercises: '8km steady state',
-  },
-  {
-    id: '3', tag: 'STRENGTH', name: 'Upper Body Power',
-    date: 'Apr 7', durationMin: 60, totalVolumeKg: 12400,
-    exercises: 'Bench Press, OHP, Rows...',
-  },
-  {
-    id: '4', tag: 'STRENGTH', name: 'Pull Day',
-    date: 'Apr 5', durationMin: 55, totalVolumeKg: 11800,
-    exercises: 'Deadlift, Pull Ups, Rows...',
-  },
+  { day: 'M', value: 0 },
+  { day: 'T', value: 0 },
+  { day: 'W', value: 0 },
+  { day: 'T', value: 0 },
+  { day: 'F', value: 0 },
+  { day: 'S', value: 0 },
+  { day: 'S', value: 0 },
 ];
 
 const STUB_PROGRESS = {
-  totalVolume: 42850,
-  volumeByWeek: [
-    { week: 'Jan 15', value: 28000 },
-    { week: 'Jan 22', value: 31000 },
-    { week: 'Jan 29', value: 29500 },
-    { week: 'Feb 5',  value: 35000 },
-    { week: 'Feb 12', value: 38000 },
-    { week: 'Feb 19', value: 42850 },
-  ],
-  prs: [
-    { name: 'Squat',         value: 185.0, date: 'Mar 12' },
-    { name: 'Bench Press',   value: 122.5, date: 'Feb 28' },
-    { name: 'Deadlift',      value: 210.0, date: 'Mar 19' },
-    { name: 'Overhead Press',value: 82.5,  date: 'Feb 14' },
-  ],
+  totalVolume: 0,
+  volumeByWeek: [],
+  prs: [],
 };
 
 const TABS = ['DASHBOARD', 'ACTIVITIES', 'PROGRESS'];
+
+// ---------------------------------------------------------------------------
+// Shape helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps a /api/sessions item to the shape WorkoutLogCard expects.
+ * API shape: { date, day, exercise_count, total_volume_kg, muscle_groups }
+ * Card shape: { id, tag, name, date, durationMin, totalVolumeKg, avgHrBpm, exercises }
+ */
+function sessionToLog(session) {
+  return {
+    id: session.date,
+    tag: 'STRENGTH',
+    name: session.muscle_groups?.length > 0
+      ? session.muscle_groups.join(' / ')
+      : session.day || 'Workout',
+    date: new Date(session.date + 'T00:00:00').toLocaleDateString('en-AU', {
+      day: 'numeric', month: 'short',
+    }),
+    durationMin: null,
+    totalVolumeKg: session.total_volume_kg ?? 0,
+    avgHrBpm: null,
+    exercises: `${session.exercise_count} exercise${session.exercise_count !== 1 ? 's' : ''}`,
+  };
+}
+
+/**
+ * Maps /api/workouts/progress response to progressData shape.
+ * API: { total_volume, volume_by_week: [{ week, value }], prs: [{ name, value, date }] }
+ */
+function mapProgress(raw) {
+  return {
+    totalVolume: raw.total_volume ?? 0,
+    volumeByWeek: raw.volume_by_week ?? [],
+    prs: raw.prs ?? [],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Dashboard tab components
@@ -137,22 +109,20 @@ function NextWorkoutBanner({ workout }) {
         </div>
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-surface-container p-3 border-l-2 border-secondary">
-            <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Time</p>
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Day</p>
             <p className="text-lg font-bold text-white tracking-tight font-body">
-              {workout.time}{' '}
-              <span className="text-lg text-secondary ml-1">{workout.date}</span>
+              {workout.day}
             </p>
           </div>
           <div className="bg-surface-container p-3 border-l-2 border-tertiary">
-            <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Duration</p>
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Program</p>
             <p className="text-lg font-bold text-white tracking-tight font-body">
-              {workout.durationMin}{' '}
-              <span className="text-[10px] text-tertiary">MIN</span>
+              {workout.program ?? '—'}
             </p>
           </div>
         </div>
         <Link
-          to="/workouts/active"
+          to="/workouts"
           className="w-full bg-primary py-3 flex items-center justify-center gap-2 hover:bg-primary-container transition-colors group"
         >
           <span className="text-on-primary text-sm font-black tracking-[0.2em] font-headline uppercase">
@@ -183,7 +153,9 @@ function WorkoutLogCard({ log }) {
         <div className="grid grid-cols-3 gap-2">
           <div>
             <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Duration</p>
-            <p className="text-xs font-bold text-white tracking-tighter font-body">{log.durationMin} MIN</p>
+            <p className="text-xs font-bold text-white tracking-tighter font-body">
+              {log.durationMin != null ? `${log.durationMin} MIN` : '—'}
+            </p>
           </div>
           <div>
             <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Total Volume</p>
@@ -193,7 +165,9 @@ function WorkoutLogCard({ log }) {
           </div>
           <div>
             <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Avg HR</p>
-            <p className="text-xs font-bold text-white tracking-tighter font-body">{log.avgHrBpm} BPM</p>
+            <p className="text-xs font-bold text-white tracking-tighter font-body">
+              {log.avgHrBpm != null ? `${log.avgHrBpm} BPM` : '—'}
+            </p>
           </div>
         </div>
       </div>
@@ -209,7 +183,7 @@ function WorkoutLogCard({ log }) {
             <p className="text-xs text-white/80 font-medium font-body">{log.exercises}</p>
           </div>
           <Link
-            to={`/workouts/${log.id}`}
+            to={`/workouts/summary/${log.id}`}
             className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-primary/10 transition-colors"
           >
             <span className="material-symbols-outlined text-sm">chevron_right</span>
@@ -239,7 +213,7 @@ function WeeklyActivityChart({ data }) {
               )}
               <div
                 className={`w-full ${isToday ? 'bg-primary border-t-2 border-primary' : 'bg-primary/20'}`}
-                style={{ height: `${item.value}%` }}
+                style={{ height: `${Math.max(item.value, 2)}%` }}
               />
             </div>
           );
@@ -272,6 +246,9 @@ function ActivitiesTab({ logs }) {
           {logs.length} sessions
         </span>
       </div>
+      {logs.length === 0 && (
+        <p className="text-on-surface-variant text-sm font-body">No sessions logged yet.</p>
+      )}
       {logs.map((log) => (
         <div key={log.id} className="bg-surface-container-low p-4 mb-3">
           <div className="flex justify-between items-start mb-2">
@@ -288,7 +265,9 @@ function ActivitiesTab({ logs }) {
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div>
               <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Duration</p>
-              <p className="text-xs font-bold text-white font-body">{log.durationMin} MIN</p>
+              <p className="text-xs font-bold text-white font-body">
+                {log.durationMin != null ? `${log.durationMin} MIN` : '—'}
+              </p>
             </div>
             <div>
               <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Volume</p>
@@ -300,7 +279,7 @@ function ActivitiesTab({ logs }) {
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-on-surface-variant font-body">{log.exercises}</p>
             <Link
-              to={`/workouts/${log.id}`}
+              to={`/workouts/summary/${log.id}`}
               className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-primary/10 transition-colors"
             >
               <span className="material-symbols-outlined text-sm text-on-surface-variant">chevron_right</span>
@@ -317,7 +296,24 @@ function ActivitiesTab({ logs }) {
 // ---------------------------------------------------------------------------
 
 function ProgressTab({ data }) {
-  const maxVolume = Math.max(...data.volumeByWeek.map((w) => w.value));
+  if (!data.volumeByWeek || data.volumeByWeek.length === 0) {
+    return (
+      <div>
+        <div className="bg-surface-container-low p-4 mb-4">
+          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
+            Total Volume
+          </p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black text-white font-headline tracking-tighter">0</span>
+            <span className="text-secondary text-lg font-bold font-body">KG</span>
+          </div>
+        </div>
+        <p className="text-on-surface-variant text-sm font-body">No workout data yet.</p>
+      </div>
+    );
+  }
+
+  const maxVolume = Math.max(...data.volumeByWeek.map((w) => w.value), 1);
 
   return (
     <div>
@@ -350,7 +346,7 @@ function ProgressTab({ data }) {
               <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
                 <div
                   className={`w-full ${isLast ? 'bg-secondary' : 'bg-primary/30'}`}
-                  style={{ height: `${heightPct}%` }}
+                  style={{ height: `${Math.max(heightPct, 2)}%` }}
                 />
               </div>
             );
@@ -366,29 +362,31 @@ function ProgressTab({ data }) {
       </div>
 
       {/* Personal records */}
-      <div className="bg-surface-container-low p-4">
-        <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
-          Recent Personal Records
-        </p>
-        {data.prs.map((pr) => (
-          <div key={pr.name} className="flex items-center justify-between py-3 border-b border-outline-variant/10 last:border-0">
-            <div>
-              <p className="text-sm font-bold text-white font-headline uppercase tracking-tight">
-                {pr.name}
-              </p>
-              <p className="text-[9px] text-on-surface-variant uppercase font-headline mt-0.5">
-                {pr.date}
-              </p>
+      {data.prs.length > 0 && (
+        <div className="bg-surface-container-low p-4">
+          <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
+            Personal Records
+          </p>
+          {data.prs.map((pr) => (
+            <div key={pr.name} className="flex items-center justify-between py-3 border-b border-outline-variant/10 last:border-0">
+              <div>
+                <p className="text-sm font-bold text-white font-headline uppercase tracking-tight">
+                  {pr.name}
+                </p>
+                <p className="text-[9px] text-on-surface-variant uppercase font-headline mt-0.5">
+                  {pr.date}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xl font-black text-secondary font-body tracking-tighter">
+                  {pr.value}
+                  <span className="text-[10px] text-on-surface-variant ml-1">KG</span>
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xl font-black text-secondary font-body tracking-tighter">
-                {pr.value}
-                <span className="text-[10px] text-on-surface-variant ml-1">KG</span>
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -397,24 +395,65 @@ function ProgressTab({ data }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function HomePage({
-  nextWorkout = STUB_NEXT_WORKOUT,
-  weekActivity = STUB_WEEK_ACTIVITY,
-  progressData = STUB_PROGRESS,
-}) {
+export default function HomePage() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
-  const [recentLogs, setRecentLogs] = useState(STUB_RECENT_LOGS);
-  const [activityLogs, setActivityLogs] = useState(STUB_ACTIVITY_LOGS);
+  const [nextWorkout, setNextWorkout] = useState(null);
+  const [recentLogs, setRecentLogs] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [weekActivity, setWeekActivity] = useState(STUB_WEEK_ACTIVITY);
+  const [progressData, setProgressData] = useState(STUB_PROGRESS);
 
   useEffect(() => {
-    fetchSessions(20)
+    // Sessions — drives recentLogs and activityLogs
+    fetchSessions()
       .then((sessions) => {
-        setRecentLogs(sessions.slice(0, 3));
-        setActivityLogs(sessions);
+        const logs = sessions.map(sessionToLog);
+        setRecentLogs(logs.slice(0, 3));
+        setActivityLogs(logs);
       })
-      .catch(() => {
-        // silently fall back to stub data on error
-      });
+      .catch(() => {});
+
+    // Week summary
+    fetch('/api/workouts/week-summary')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length === 7) setWeekActivity(data);
+      })
+      .catch(() => {});
+
+    // Progress
+    fetch('/api/workouts/progress')
+      .then((r) => r.json())
+      .then((data) => setProgressData(mapProgress(data)))
+      .catch(() => {});
+
+    // Today's schedule
+    fetch('/api/schedule/today')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data) return;
+        // data = { id, routine_id, scheduled_date, status }
+        // Try to resolve program name from routine_id
+        if (data.routine_id) {
+          fetch(`/api/programs/${data.routine_id}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((program) => {
+              setNextWorkout({
+                name: program?.name ?? 'Scheduled Workout',
+                day: new Date(data.scheduled_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long' }),
+                program: program?.name ?? null,
+              });
+            })
+            .catch(() => {
+              setNextWorkout({
+                name: 'Scheduled Workout',
+                day: data.scheduled_date,
+                program: null,
+              });
+            });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -463,6 +502,9 @@ export default function HomePage({
               </button>
             </div>
             <div className="flex flex-col">
+              {recentLogs.length === 0 && (
+                <p className="text-on-surface-variant text-sm font-body">No sessions logged yet.</p>
+              )}
               {recentLogs.map((log) => (
                 <WorkoutLogCard key={log.id} log={log} />
               ))}
