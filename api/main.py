@@ -174,7 +174,7 @@ async def add_program_exercise(program_id: str, payload: ProgramExerciseInput):
     data = {
         "parent": {"database_id": NOTION_PROGRAM_EXERCISES_DB},
         "properties": {
-            "Name": {"title": [{"text": {"content": f"Routine exercise"}}]},
+            "Name": {"title": [{"text": {"content": "Program exercise"}}]},
             "Program": {"relation": [{"id": program_id}]},
             "Exercise": {"relation": [{"id": payload.exercise_id}]},
             "Default Sets": {"number": payload.default_sets},
