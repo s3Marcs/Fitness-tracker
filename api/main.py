@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import httpx
@@ -328,12 +328,23 @@ async def update_schedule_entry(entry_id: str, payload: dict):
 
 from datetime import timedelta
 
+
+
 @app.get("/api/workouts/progress")
-async def get_progress():
+async def get_progress(range: str = Query("all", regex="^(all|3months|1month)$")):
     results = await query_db(NOTION_WORKOUT_DB)
-    
+
+    now = datetime.now()
+    if range == "1month":
+        cutoff = now - timedelta(days=30)
+    elif range == "3months":
+        cutoff = now - timedelta(days=91)
+    else:
+        cutoff = None
+
     total_volume = 0.0
     volume_by_week = {}
+    volume_by_month = {}
     prs = {}
 
     for workout in results:
@@ -344,39 +355,54 @@ async def get_progress():
         weight_kg = properties["Weight (kg)"]["number"] or 0.0
         date_str = properties["Date"]["date"]["start"].split('T')[0]
         workout_date = datetime.strptime(date_str, "%Y-%m-%d")
-        
-        # Calculate total volume
+
+        if cutoff and workout_date < cutoff:
+            continue
+
         raw_volume = sets * reps * weight_kg
         total_volume += raw_volume
-        
-        # Calculate volume by week
+
         year, week, _ = workout_date.isocalendar()
         if (year, week) not in volume_by_week:
             volume_by_week[(year, week)] = 0.0
         volume_by_week[(year, week)] += raw_volume
-        
-        # Track PRs for each exercise
+
+        month_key = (workout_date.year, workout_date.month)
+        if month_key not in volume_by_month:
+            volume_by_month[month_key] = 0.0
+        volume_by_month[month_key] += raw_volume
+
         if exercise_name not in prs or weight_kg > prs[exercise_name]["value"]:
             prs[exercise_name] = {
                 "name": exercise_name,
                 "value": weight_kg,
                 "date": workout_date.strftime("%b %d")
             }
-    
-    # Sort and limit volume_by_week to the last 8 weeks
-    sorted_volume_by_week = sorted(volume_by_week.items(), key=lambda x: (x[0][0], x[0][1]))
-    recent_volume_by_week = sorted_volume_by_week[-8:]
-    formatted_volume_by_week = [
-        {"week": datetime.fromisocalendar(year, week, 1).strftime("%b %d"), "value": value}
-        for (year, week), value in recent_volume_by_week
+
+    # Weekly — limit based on range
+    week_limit = 4 if range == "1month" else 12 if range == "3months" else 8
+    sorted_weeks = sorted(volume_by_week.items(), key=lambda x: (x[0][0], x[0][1]))
+    recent_weeks = sorted_weeks[-week_limit:]
+    formatted_weeks = [
+        {"label": datetime.fromisocalendar(y, w, 1).strftime("%b %d"), "value": round(v)}
+        for (y, w), v in recent_weeks
     ]
-    
-    # Sort and limit PRs to the top 5 exercises by max weight
+
+    # Monthly — limit based on range
+    month_limit = 1 if range == "1month" else 3 if range == "3months" else 12
+    sorted_months = sorted(volume_by_month.items())
+    recent_months = sorted_months[-month_limit:]
+    formatted_months = [
+        {"label": datetime(y, m, 1).strftime("%b %Y"), "value": round(v)}
+        for (y, m), v in recent_months
+    ]
+
     sorted_prs = sorted(prs.values(), key=lambda x: x["value"], reverse=True)[:5]
-    
+
     return {
         "total_volume": total_volume,
-        "volume_by_week": formatted_volume_by_week,
+        "volume_by_week": formatted_weeks,
+        "volume_by_month": formatted_months,
         "prs": sorted_prs
     }
 
@@ -403,7 +429,7 @@ async def get_week_summary():
     raw = [volumes[d.strftime("%Y-%m-%d")] for d in days]
     max_vol = max(raw) if max(raw) > 0 else 1
     return [
-        {"day": day_labels[i], "value": int(round((raw[i] / max_vol) * 100))}
+        {"day": day_labels[i], "value": round(raw[i])}
         for i in range(7)
     ]
 

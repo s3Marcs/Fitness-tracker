@@ -15,15 +15,19 @@ const STUB_WEEK_ACTIVITY = [
 const STUB_PROGRESS = {
   totalVolume: 0,
   volumeByWeek: [],
+  volumeByMonth: [],
   prs: [],
 };
 
 const TABS = ['DASHBOARD', 'ACTIVITIES', 'PROGRESS'];
+const RANGE_OPTIONS = ['1month', '3months', 'all'];
+const RANGE_LABELS = { '1month': '1 Month', '3months': '3 Months', 'all': 'All Time' };
 
 function mapProgress(raw) {
   return {
     totalVolume: raw.total_volume ?? 0,
     volumeByWeek: raw.volume_by_week ?? [],
+    volumeByMonth: raw.volume_by_month ?? [],
     prs: raw.prs ?? [],
   };
 }
@@ -153,14 +157,19 @@ function WorkoutLogCard({ log }) {
 
 function WeeklyActivityChart({ data }) {
   const todayIndex = (new Date().getDay() + 6) % 7;
+  const maxVal = Math.max(...data.map((d) => d.value), 1);
   return (
     <div className="bg-surface-container p-4">
-      <p className="text-[10px] text-on-surface-variant font-bold mb-4 uppercase font-headline">
-        Weekly activity
-      </p>
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline">
+          Weekly Volume
+        </p>
+        <p className="text-[10px] text-on-surface-variant font-headline uppercase">KG</p>
+      </div>
       <div className="flex items-end justify-between h-32 gap-1 px-2">
         {data.map((item, i) => {
           const isToday = i === todayIndex;
+          const heightPct = (item.value / maxVal) * 100;
           return (
             <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative">
               {isToday && (
@@ -168,9 +177,14 @@ function WeeklyActivityChart({ data }) {
                   TODAY
                 </div>
               )}
+              {item.value > 0 && (
+                <div className="absolute bottom-full mb-0.5 text-[8px] text-on-surface-variant font-body whitespace-nowrap">
+                  {item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}t` : item.value}
+                </div>
+              )}
               <div
-                className={`w-full ${isToday ? 'bg-primary border-t-2 border-primary' : 'bg-primary/20'}`}
-                style={{ height: `${Math.max(item.value, 2)}%` }}
+                className={`w-full ${isToday ? 'bg-primary' : 'bg-primary/20'}`}
+                style={{ height: `${Math.max(heightPct, 2)}%` }}
               />
             </div>
           );
@@ -244,70 +258,108 @@ function ActivitiesTab({ logs }) {
 // Progress tab
 // ---------------------------------------------------------------------------
 
-function ProgressTab({ data }) {
-  if (!data.volumeByWeek || data.volumeByWeek.length === 0) {
-    return (
-      <div>
-        <div className="bg-surface-container-low p-4 mb-4">
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
-            Total Volume
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-black text-white font-headline tracking-tighter">0</span>
-            <span className="text-secondary text-lg font-bold font-body">KG</span>
-          </div>
-        </div>
-        <p className="text-on-surface-variant text-sm font-body">No workout data yet.</p>
+function VolumeChart({ data, labelKey = 'label' }) {
+  const maxVal = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div>
+      <div className="flex items-end gap-1 h-24 px-1">
+        {data.map((w, i) => {
+          const isLast = i === data.length - 1;
+          const heightPct = (w.value / maxVal) * 100;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1 relative">
+              {w.value > 0 && (
+                <div className="absolute bottom-full mb-0.5 text-[7px] text-on-surface-variant font-body whitespace-nowrap">
+                  {w.value >= 1000 ? `${(w.value / 1000).toFixed(1)}t` : w.value}
+                </div>
+              )}
+              <div
+                className={`w-full ${isLast ? 'bg-secondary' : 'bg-primary/30'}`}
+                style={{ height: `${Math.max(heightPct, 2)}%` }}
+              />
+            </div>
+          );
+        })}
       </div>
-    );
-  }
+      <div className="flex justify-between mt-2 px-1">
+        {data.map((w, i) => (
+          <span key={i} className="text-[8px] text-on-surface-variant font-body truncate">
+            {w[labelKey].split(' ')[0]}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-  const maxVolume = Math.max(...data.volumeByWeek.map((w) => w.value), 1);
+function ProgressTab({ data, range, onRangeChange }) {
+  const [volumeView, setVolumeView] = useState('week');
+
+  const chartData = volumeView === 'week' ? data.volumeByWeek : data.volumeByMonth;
+  const hasData = chartData && chartData.length > 0;
 
   return (
     <div>
+      {/* Range toggle */}
+      <div className="flex gap-1 mb-4">
+        {RANGE_OPTIONS.map((r) => (
+          <button
+            key={r}
+            onClick={() => onRangeChange(r)}
+            className={`flex-1 py-1.5 text-[9px] font-bold uppercase font-headline transition-colors ${
+              range === r
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-container text-on-surface-variant hover:text-white'
+            }`}
+          >
+            {RANGE_LABELS[r]}
+          </button>
+        ))}
+      </div>
+
+      {/* Total volume stat */}
       <div className="bg-surface-container-low p-4 mb-4">
         <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
-          Total Volume
+          Total Volume — {RANGE_LABELS[range]}
         </p>
         <div className="flex items-baseline gap-2">
           <span className="text-4xl font-black text-white font-headline tracking-tighter">
             {(data.totalVolume / 1000).toFixed(1)}
           </span>
           <span className="text-secondary text-lg font-bold font-body">T</span>
-          <span className="text-[10px] text-on-surface-variant uppercase font-headline ml-1">
-            all time
-          </span>
         </div>
       </div>
 
+      {/* Volume chart with week/month toggle */}
       <div className="bg-surface-container p-4 mb-4">
-        <p className="text-[10px] text-on-surface-variant font-bold mb-4 uppercase font-headline">
-          Volume Over Time
-        </p>
-        <div className="flex items-end gap-1 h-24 px-1">
-          {data.volumeByWeek.map((w, i) => {
-            const isLast = i === data.volumeByWeek.length - 1;
-            const heightPct = (w.value / maxVolume) * 100;
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                <div
-                  className={`w-full ${isLast ? 'bg-secondary' : 'bg-primary/30'}`}
-                  style={{ height: `${Math.max(heightPct, 2)}%` }}
-                />
-              </div>
-            );
-          })}
+        <div className="flex justify-between items-center mb-4">
+          <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline">
+            Volume Over Time
+          </p>
+          <div className="flex gap-1">
+            {['week', 'month'].map((v) => (
+              <button
+                key={v}
+                onClick={() => setVolumeView(v)}
+                className={`px-2 py-0.5 text-[9px] font-bold uppercase font-headline transition-colors ${
+                  volumeView === v
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-on-surface-variant hover:text-white'
+                }`}
+              >
+                {v === 'week' ? 'Weekly' : 'Monthly'}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex justify-between mt-2 px-1">
-          {data.volumeByWeek.map((w, i) => (
-            <span key={i} className="text-[8px] text-on-surface-variant font-body">
-              {w.week.split(' ')[0]}
-            </span>
-          ))}
-        </div>
+        {hasData ? (
+          <VolumeChart data={chartData} labelKey="label" />
+        ) : (
+          <p className="text-on-surface-variant text-sm font-body">No data for this range.</p>
+        )}
       </div>
 
+      {/* Personal records */}
       {data.prs.length > 0 && (
         <div className="bg-surface-container-low p-4">
           <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
@@ -344,6 +396,7 @@ export default function HomePage() {
   const [activityLogs, setActivityLogs] = useState([]);
   const [weekActivity, setWeekActivity] = useState(STUB_WEEK_ACTIVITY);
   const [progressData, setProgressData] = useState(STUB_PROGRESS);
+  const [progressRange, setProgressRange] = useState('all');
 
   useEffect(() => {
     fetchSessions()
@@ -358,11 +411,6 @@ export default function HomePage() {
       .then((data) => {
         if (Array.isArray(data) && data.length === 7) setWeekActivity(data);
       })
-      .catch(() => {});
-
-    fetch('/api/workouts/progress')
-      .then((r) => r.json())
-      .then((data) => setProgressData(mapProgress(data)))
       .catch(() => {});
 
     fetch('/api/schedule/today')
@@ -384,6 +432,13 @@ export default function HomePage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetch(`/api/workouts/progress?range=${progressRange}`)
+      .then((r) => r.json())
+      .then((data) => setProgressData(mapProgress(data)))
+      .catch(() => {});
+  }, [progressRange]);
 
   return (
     <main
@@ -447,7 +502,11 @@ export default function HomePage() {
       )}
 
       {activeTab === 'PROGRESS' && (
-        <ProgressTab data={progressData} />
+        <ProgressTab
+          data={progressData}
+          range={progressRange}
+          onRangeChange={setProgressRange}
+        />
       )}
     </main>
   );
