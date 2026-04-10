@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-/*
- * WorkoutsPage
- *
- * On mount:
- *   1. GET /api/schedule/today → { id, routine_id, scheduled_date, status } | null
- *   2. GET /api/programs/{routine_id}/exercises → [{ id, name, default_sets, exercise_id, order }]
- *   3. GET /api/exercises → [{ id, name, muscle_group }] (used to resolve muscle_group for POST payload)
- *
- * Finish button:
- *   - Filters to sets where done=true
- *   - Builds SessionPayload: { date, exercises: [{ exercise, muscle_group, sets, reps, weight_kg }] }
- *   - POST /api/sessions → navigate to /workouts/{date}
- */
+const MUSCLE_COLORS = {
+  'Chest':     { bg: 'bg-blue-900/40',    text: 'text-blue-300' },
+  'Back':      { bg: 'bg-emerald-900/40', text: 'text-emerald-300' },
+  'Shoulders': { bg: 'bg-violet-900/40',  text: 'text-violet-300' },
+  'Biceps':    { bg: 'bg-cyan-900/40',    text: 'text-cyan-300' },
+  'Triceps':   { bg: 'bg-orange-900/40',  text: 'text-orange-300' },
+  'Legs':      { bg: 'bg-yellow-900/40',  text: 'text-yellow-300' },
+  'Core':      { bg: 'bg-rose-900/40',    text: 'text-rose-300' },
+};
+const DEFAULT_MUSCLE_COLOR = { bg: 'bg-surface-container-highest', text: 'text-on-surface-variant' };
+
+function getMuscleColor(muscleGroup) {
+  return MUSCLE_COLORS[muscleGroup] ?? DEFAULT_MUSCLE_COLOR;
+}
 
 function SetRow({ set, setIndex, onUpdate }) {
   return (
@@ -21,7 +22,6 @@ function SetRow({ set, setIndex, onUpdate }) {
       <span className="text-[10px] text-on-surface-variant font-bold font-headline w-4">
         {setIndex + 1}
       </span>
-
       <div className="flex-1 bg-surface-container border-b border-outline focus-within:border-primary transition-colors px-2 py-1">
         <input
           type="number"
@@ -33,7 +33,6 @@ function SetRow({ set, setIndex, onUpdate }) {
         />
       </div>
       <span className="text-[9px] text-on-surface-variant uppercase font-headline">KG</span>
-
       <div className="flex-1 bg-surface-container border-b border-outline focus-within:border-primary transition-colors px-2 py-1">
         <input
           type="number"
@@ -45,7 +44,6 @@ function SetRow({ set, setIndex, onUpdate }) {
         />
       </div>
       <span className="text-[9px] text-on-surface-variant uppercase font-headline">REPS</span>
-
       <button
         onClick={() => onUpdate(setIndex, 'done', !set.done)}
         className={`w-8 h-8 flex items-center justify-center transition-colors ${
@@ -63,13 +61,14 @@ function SetRow({ set, setIndex, onUpdate }) {
 }
 
 function ExerciseBlock({ exercise, onUpdateSet }) {
+  const colors = getMuscleColor(exercise.muscleGroup);
   return (
     <div className="bg-surface-container-low mb-4">
       <div className="p-3 border-b border-outline-variant/10">
         <div className="flex justify-between items-start">
           <div>
-            <span className="bg-surface-container-highest text-on-surface-variant text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline">
-              {exercise.tag}
+            <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
+              {exercise.muscleGroup || 'General'}
             </span>
             <h3 className="text-base font-black text-white uppercase font-headline tracking-tight">
               {exercise.name}
@@ -82,7 +81,6 @@ function ExerciseBlock({ exercise, onUpdateSet }) {
           </div>
         </div>
       </div>
-
       <div className="flex items-center gap-3 px-3 pt-2 pb-1">
         <span className="text-[9px] text-on-surface-variant uppercase font-headline w-4">#</span>
         <span className="flex-1 text-[9px] text-on-surface-variant uppercase font-headline text-right">KG</span>
@@ -91,7 +89,6 @@ function ExerciseBlock({ exercise, onUpdateSet }) {
         <span className="text-[9px] text-on-surface-variant uppercase font-headline w-6"></span>
         <span className="w-8"></span>
       </div>
-
       <div className="px-3 pb-3">
         {exercise.sets.map((set, i) => (
           <SetRow
@@ -106,12 +103,13 @@ function ExerciseBlock({ exercise, onUpdateSet }) {
   );
 }
 
-function apiExerciseToWorkoutExercise(ex, index) {
+function apiExerciseToWorkoutExercise(ex, exerciseLibrary) {
+  const libEntry = exerciseLibrary[ex.exercise_id];
   return {
     id: ex.id,
     name: ex.name,
     exercise_id: ex.exercise_id,
-    tag: index === 0 ? 'Main Lift' : 'Accessory',
+    muscleGroup: libEntry?.muscle_group ?? 'General',
     sets: Array.from({ length: ex.default_sets || 3 }, () => ({
       weight: 0,
       reps: 0,
@@ -130,15 +128,15 @@ export default function WorkoutsPage() {
   const [scheduledDate, setScheduledDate] = useState(null);
 
   useEffect(() => {
-    const exercisesPromise = fetch('/api/exercises')
+    let exerciseMap = {};
+
+    fetch('/api/exercises')
       .then((r) => r.json())
       .then((list) => {
-        const map = {};
-        list.forEach((ex) => { map[ex.id] = ex; });
-        setExerciseLibrary(map);
-      });
-
-    const schedulePromise = fetch('/api/schedule/today')
+        list.forEach((ex) => { exerciseMap[ex.id] = ex; });
+        setExerciseLibrary(exerciseMap);
+        return fetch('/api/schedule/today');
+      })
       .then((r) => r.json())
       .then((schedule) => {
         if (!schedule || !schedule.routine_id) return;
@@ -153,14 +151,12 @@ export default function WorkoutsPage() {
                 setWorkoutName(program?.name ?? "Today's Workout");
                 setExercises(
                   Array.isArray(exList)
-                    ? exList.map((ex, i) => apiExerciseToWorkoutExercise(ex, i))
+                    ? exList.map((ex) => apiExerciseToWorkoutExercise(ex, exerciseMap))
                     : []
                 );
               })
           );
-      });
-
-    Promise.all([exercisesPromise, schedulePromise])
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -177,33 +173,21 @@ export default function WorkoutsPage() {
 
   async function handleFinish() {
     const date = scheduledDate ?? new Date().toISOString().split('T')[0];
-
-    // Build payload — only done sets, grouped by exercise
     const exerciseRows = [];
+
     exercises.forEach((ex) => {
       const doneSets = ex.sets.filter((s) => s.done && s.reps > 0);
       if (doneSets.length === 0) return;
-
       const libraryEntry = exerciseLibrary[ex.exercise_id];
       const muscleGroup = libraryEntry?.muscle_group ?? 'General';
-
-      // Group identical weight/rep combos into single rows
       const grouped = {};
       doneSets.forEach((s) => {
         const key = `${s.weight}|${s.reps}`;
         if (!grouped[key]) grouped[key] = { weight: s.weight, reps: s.reps, count: 0 };
         grouped[key].count += 1;
       });
-
       Object.values(grouped).forEach(({ weight, reps, count }) => {
-        exerciseRows.push({
-          exercise: ex.name,
-          muscle_group: muscleGroup,
-          sets: count,
-          reps,
-          weight_kg: weight,
-          notes: '',
-        });
+        exerciseRows.push({ exercise: ex.name, muscle_group: muscleGroup, sets: count, reps, weight_kg: weight, notes: '' });
       });
     });
 

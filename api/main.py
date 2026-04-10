@@ -230,11 +230,17 @@ async def get_todays_schedule():
         props = r["properties"]
         routine_relations = props["Routine"]["relation"]
         routine_id = routine_relations[0]["id"] if routine_relations else None
+
+        # Check if already completed today
+        completed_filter = {"filter": {"property": "Date", "date": {"equals": today}}}
+        completed_results = await query_db(NOTION_WORKOUT_DB, completed_filter)
+        status = "Completed" if completed_results else props["Status"]["select"]["name"]
+
         return {
             "id": r["id"],
             "routine_id": routine_id,
             "scheduled_date": today,
-            "status": props["Status"]["select"]["name"]
+            "status": status
         }
 
     # Fallback: check Plans DB by day-of-week
@@ -248,11 +254,17 @@ async def get_todays_schedule():
     props = p["properties"]
     program_relations = props["Program"]["relation"]
     program_id = program_relations[0]["id"] if program_relations else None
+
+    # Check if already completed today
+    completed_filter = {"filter": {"property": "Date", "date": {"equals": today}}}
+    completed_results = await query_db(NOTION_WORKOUT_DB, completed_filter)
+    status = "Completed" if completed_results else "Scheduled"
+
     return {
         "id": p["id"],
         "routine_id": program_id,
         "scheduled_date": today,
-        "status": "Scheduled"
+        "status": status
     }
     
 @app.get("/api/schedule")

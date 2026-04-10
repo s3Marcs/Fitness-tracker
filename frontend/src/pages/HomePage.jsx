@@ -2,23 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchSessions } from '../hooks/useSessions';
 
-/*
- * HomePage
- *
- * All data is self-fetched. No props required.
- *
- * Endpoints:
- *   nextWorkout  <- GET /api/schedule/today (returns null if nothing scheduled)
- *   recentLogs   <- GET /api/sessions (first 3)
- *   activityLogs <- GET /api/sessions (all)
- *   weekActivity <- GET /api/workouts/week-summary
- *   progressData <- GET /api/workouts/progress
- */
-
-// ---------------------------------------------------------------------------
-// Stub data (shown while loading or on fetch error)
-// ---------------------------------------------------------------------------
-
 const STUB_WEEK_ACTIVITY = [
   { day: 'M', value: 0 },
   { day: 'T', value: 0 },
@@ -37,34 +20,6 @@ const STUB_PROGRESS = {
 
 const TABS = ['DASHBOARD', 'ACTIVITIES', 'PROGRESS'];
 
-// ---------------------------------------------------------------------------
-// Shape helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Maps a /api/sessions item to the shape WorkoutLogCard expects.
- * API shape: { date, day, exercise_count, total_volume_kg, muscle_groups }
- * Card shape: { id, tag, name, date, durationMin, totalVolumeKg, avgHrBpm, exercises }
- */
-function sessionToLog(session) {
-  return {
-    id: session.date,
-    tag: 'STRENGTH',
-    name: session.muscle_groups?.length > 0
-      ? session.muscle_groups.join(' / ')
-      : session.day || 'Workout',
-    date: new Date(session.date + 'T00:00:00').toLocaleDateString('en-AU', {
-      day: 'numeric', month: 'short',
-    }),
-    totalVolumeKg: session.total_volume_kg ?? 0,
-    exercises: `${session.exercise_count} exercise${session.exercise_count !== 1 ? 's' : ''}`,
-  };
-}
-
-/**
- * Maps /api/workouts/progress response to progressData shape.
- * API: { total_volume, volume_by_week: [{ week, value }], prs: [{ name, value, date }] }
- */
 function mapProgress(raw) {
   return {
     totalVolume: raw.total_volume ?? 0,
@@ -92,6 +47,28 @@ function NextWorkoutBanner({ workout }) {
       </section>
     );
   }
+
+  if (workout.status === 'Completed') {
+    return (
+      <section>
+        <div className="bg-surface-container-low p-4">
+          <p className="text-[10px] text-primary font-bold tracking-tighter mb-1 uppercase font-headline">
+            Today's workout
+          </p>
+          <h3 className="text-2xl font-black text-white tracking-tight font-headline uppercase mb-3">
+            {workout.name}
+          </h3>
+          <div className="flex items-center gap-2 bg-secondary/10 p-3">
+            <span className="material-symbols-outlined text-secondary text-sm">check_circle</span>
+            <span className="text-secondary text-sm font-black tracking-[0.15em] font-headline uppercase">
+              Completed
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section>
       <div className="bg-surface-container-low p-4">
@@ -108,15 +85,11 @@ function NextWorkoutBanner({ workout }) {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-surface-container p-3 border-l-2 border-secondary">
             <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Day</p>
-            <p className="text-lg font-bold text-white tracking-tight font-body">
-              {workout.day}
-            </p>
+            <p className="text-lg font-bold text-white tracking-tight font-body">{workout.day}</p>
           </div>
           <div className="bg-surface-container p-3 border-l-2 border-tertiary">
             <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Program</p>
-            <p className="text-lg font-bold text-white tracking-tight font-body">
-              {workout.program ?? '—'}
-            </p>
+            <p className="text-lg font-bold text-white tracking-tight font-body">{workout.program ?? '—'}</p>
           </div>
         </div>
         <Link
@@ -148,13 +121,11 @@ function WorkoutLogCard({ log }) {
           </div>
           <span className="text-[10px] text-on-surface-variant font-headline uppercase">{log.date}</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Total Volume</p>
-            <p className="text-xs font-bold text-white tracking-tighter font-body">
-              {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
-            </p>
-          </div>
+        <div>
+          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Total Volume</p>
+          <p className="text-xs font-bold text-white tracking-tighter font-body">
+            {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
+          </p>
         </div>
       </div>
       <div className="bg-surface-container-lowest p-3">
@@ -181,7 +152,7 @@ function WorkoutLogCard({ log }) {
 }
 
 function WeeklyActivityChart({ data }) {
-  const todayIndex = (new Date().getDay() + 6) % 7; // JS: 0=Sun, convert to 0=Mon
+  const todayIndex = (new Date().getDay() + 6) % 7;
   return (
     <div className="bg-surface-container p-4">
       <p className="text-[10px] text-on-surface-variant font-bold mb-4 uppercase font-headline">
@@ -248,13 +219,11 @@ function ActivitiesTab({ logs }) {
             </div>
             <span className="text-[10px] text-on-surface-variant font-headline uppercase">{log.date}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div>
-              <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Volume</p>
-              <p className="text-xs font-bold text-white font-body">
-                {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
-              </p>
-            </div>
+          <div className="mb-3">
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Volume</p>
+            <p className="text-xs font-bold text-white font-body">
+              {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
+            </p>
           </div>
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-on-surface-variant font-body">{log.exercises}</p>
@@ -297,7 +266,6 @@ function ProgressTab({ data }) {
 
   return (
     <div>
-      {/* Total volume stat */}
       <div className="bg-surface-container-low p-4 mb-4">
         <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
           Total Volume
@@ -313,7 +281,6 @@ function ProgressTab({ data }) {
         </div>
       </div>
 
-      {/* Volume over time chart */}
       <div className="bg-surface-container p-4 mb-4">
         <p className="text-[10px] text-on-surface-variant font-bold mb-4 uppercase font-headline">
           Volume Over Time
@@ -341,7 +308,6 @@ function ProgressTab({ data }) {
         </div>
       </div>
 
-      {/* Personal records */}
       {data.prs.length > 0 && (
         <div className="bg-surface-container-low p-4">
           <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
@@ -350,12 +316,8 @@ function ProgressTab({ data }) {
           {data.prs.map((pr) => (
             <div key={pr.name} className="flex items-center justify-between py-3 border-b border-outline-variant/10 last:border-0">
               <div>
-                <p className="text-sm font-bold text-white font-headline uppercase tracking-tight">
-                  {pr.name}
-                </p>
-                <p className="text-[9px] text-on-surface-variant uppercase font-headline mt-0.5">
-                  {pr.date}
-                </p>
+                <p className="text-sm font-bold text-white font-headline uppercase tracking-tight">{pr.name}</p>
+                <p className="text-[9px] text-on-surface-variant uppercase font-headline mt-0.5">{pr.date}</p>
               </div>
               <div className="text-right">
                 <p className="text-xl font-black text-secondary font-body tracking-tighter">
@@ -384,16 +346,13 @@ export default function HomePage() {
   const [progressData, setProgressData] = useState(STUB_PROGRESS);
 
   useEffect(() => {
-    // Sessions — drives recentLogs and activityLogs
     fetchSessions()
       .then((sessions) => {
-        const logs = sessions.map(sessionToLog);
-        setRecentLogs(logs.slice(0, 3));
-        setActivityLogs(logs);
+        setRecentLogs(sessions.slice(0, 3));
+        setActivityLogs(sessions);
       })
       .catch(() => {});
 
-    // Week summary
     fetch('/api/workouts/week-summary')
       .then((r) => r.json())
       .then((data) => {
@@ -401,30 +360,29 @@ export default function HomePage() {
       })
       .catch(() => {});
 
-    // Progress
     fetch('/api/workouts/progress')
       .then((r) => r.json())
       .then((data) => setProgressData(mapProgress(data)))
       .catch(() => {});
 
-// Today's schedule
-fetch('/api/schedule/today')
-  .then((r) => r.json())
-  .then((data) => {
-    if (!data || !data.routine_id) return;
-    fetch('/api/programs')
+    fetch('/api/schedule/today')
       .then((r) => r.json())
-      .then((programs) => {
-        const program = programs.find((p) => p.id === data.routine_id);
-        const programName = program?.name ?? 'Scheduled Workout';
-        setNextWorkout({
-          name: programName,
-          day: new Date(data.scheduled_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long' }),
-          program: programName,
-        });
-      });
-  })
-  .catch(() => {});
+      .then((data) => {
+        if (!data || !data.routine_id) return;
+        fetch('/api/programs')
+          .then((r) => r.json())
+          .then((programs) => {
+            const program = programs.find((p) => p.id === data.routine_id);
+            const programName = program?.name ?? 'Scheduled Workout';
+            setNextWorkout({
+              name: programName,
+              day: new Date(data.scheduled_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long' }),
+              program: programName,
+              status: data.status,
+            });
+          });
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -432,14 +390,12 @@ fetch('/api/schedule/today')
       className="pb-24 px-4 max-w-7xl mx-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}
     >
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white">
           HOME
         </h1>
       </div>
 
-      {/* Sub-nav tabs */}
       <div className="flex border-b border-outline-variant/20 mb-8 overflow-x-auto">
         {TABS.map((tab) => (
           <button
@@ -456,7 +412,6 @@ fetch('/api/schedule/today')
         ))}
       </div>
 
-      {/* Dashboard */}
       {activeTab === 'DASHBOARD' && (
         <>
           <NextWorkoutBanner workout={nextWorkout} />
@@ -487,12 +442,10 @@ fetch('/api/schedule/today')
         </>
       )}
 
-      {/* Activities */}
       {activeTab === 'ACTIVITIES' && (
         <ActivitiesTab logs={activityLogs} />
       )}
 
-      {/* Progress */}
       {activeTab === 'PROGRESS' && (
         <ProgressTab data={progressData} />
       )}
