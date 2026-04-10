@@ -45,9 +45,10 @@ app = FastAPI()
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 NOTION_WORKOUT_DB = os.getenv("NOTION_DATABASE_ID", "5b69a72d028e406eb91e330519729213")
 NOTION_EXERCISES_DB = "25763bd843c645828dc29e7e21ffb633"
-NOTION_ROUTINES_DB = "79791a9fb06347159d07fad3b3f99727"
-NOTION_ROUTINE_EXERCISES_DB = "e103ffbcfb9c47d1b1584f3f70c60ebe"
+NOTION_PROGRAMS_DB = "79791a9fb06347159d07fad3b3f99727"
+NOTION_PROGRAM_EXERCISES_DB = "e103ffbcfb9c47d1b1584f3f70c60ebe"
 NOTION_SCHEDULE_DB = "9dc7abad0a3f4cc2a0bdcdb7413a1246"
+NOTION_PLANS_DB = "5c4a5c96a1a04b8caa3149ad9f5790e7"
 
 app.add_middleware(
     CORSMiddleware,
@@ -119,8 +120,8 @@ async def get_exercises():
 
 # --- Routines ---
 
-@app.get("/api/routines")
-async def get_routines():
+@app.get("/api/programs")
+async def get_programs():
     results = await query_db(NOTION_ROUTINES_DB)
     routines = []
     for r in results:
@@ -130,8 +131,8 @@ async def get_routines():
         routines.append({"id": r["id"], "name": name, "day": day})
     return routines
 
-@app.post("/api/routines", status_code=201)
-async def create_routine(payload: dict):
+@app.post("/api/programs", status_code=201)
+async def create_program(payload: dict):
     url = "https://api.notion.com/v1/pages"
     data = {
         "parent": {"database_id": NOTION_ROUTINES_DB},
@@ -145,8 +146,8 @@ async def create_routine(payload: dict):
 
 # --- Routine Exercises ---
 
-@app.get("/api/routines/{routine_id}/exercises")
-async def get_routine_exercises(routine_id: str):
+@app.get("/api/programs/{program_id}/exercises")
+async def get_program_exercises(program_id: str):
     filter_data = {
         "filter": {"property": "Routine", "relation": {"contains": routine_id}},
         "sorts": [{"property": "Order", "direction": "ascending"}]
@@ -169,8 +170,8 @@ async def get_routine_exercises(routine_id: str):
         })
     return items
 
-@app.post("/api/routines/{routine_id}/exercises", status_code=201)
-async def add_routine_exercise(routine_id: str, payload: RoutineExerciseInput):
+@app.post("/api/programs/{program_id}/exercises", status_code=201)
+async def add_program_exercise(program_id: str, payload: RoutineExerciseInput):
     url = "https://api.notion.com/v1/pages"
     data = {
         "parent": {"database_id": NOTION_ROUTINE_EXERCISES_DB},
@@ -297,6 +298,40 @@ async def update_workout(page_id: str, workout: WorkoutEntry):
 @app.delete("/api/workouts/{page_id}", status_code=204)
 async def delete_workout(page_id: str):
     url = f"https://api.notion.com/v1/pages/{page_id}"
+    await notion_request("PATCH", url, data={"archived": True})
+
+# --- Plans ---
+
+@app.get("/api/plans")
+async def get_plans():
+    results = await query_db(NOTION_PLANS_DB)
+    plans = []
+    for r in results:
+        props = r["properties"]
+        name = props["Name"]["title"][0]["plain_text"] if props["Name"]["title"] else ""
+        day = props["Day"]["select"]["name"] if props["Day"]["select"] else ""
+        program_relations = props["Program"]["relation"]
+        program_id = program_relations[0]["id"] if program_relations else None
+        plans.append({"id": r["id"], "name": name, "day": day, "program_id": program_id})
+    return plans
+
+@app.post("/api/plans", status_code=201)
+async def create_plan(payload: dict):
+    url = "https://api.notion.com/v1/pages"
+    data = {
+        "parent": {"database_id": NOTION_PLANS_DB},
+        "properties": {
+            "Name": {"title": [{"text": {"content": payload["name"]}}]},
+            "Program": {"relation": [{"id": payload["program_id"]}] if payload.get("program_id") else []},
+            "Day": {"select": {"name": payload["day"]}}
+        }
+    }
+    result = await notion_request("POST", url, data)
+    return {"id": result["id"]}
+
+@app.delete("/api/plans/{plan_id}", status_code=204)
+async def delete_plan(plan_id: str):
+    url = f"https://api.notion.com/v1/pages/{plan_id}"
     await notion_request("PATCH", url, data={"archived": True})
 
 # --- Sessions (existing) ---
