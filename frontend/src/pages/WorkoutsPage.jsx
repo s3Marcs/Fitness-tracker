@@ -186,12 +186,15 @@ export default function WorkoutsPage({
     >
       {/* Header */}
       <div className="mb-4">
-        <p className="text-[10px] text-primary font-bold tracking-tighter mb-1 uppercase font-headline">
+        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-2">
+          WORKOUTS
+        </h1>
+        <p className="text-[10px] text-primary font-bold tracking-tighter uppercase font-headline">
           Active Workout
         </p>
-        <h1 className="text-3xl font-headline font-black tracking-tighter uppercase text-white">
+        <p className="text-xl font-black text-white tracking-tight font-headline uppercase mt-1">
           {workoutName}
-        </h1>
+        </p>
       </div>
 
       {/* Live stats bar */}
