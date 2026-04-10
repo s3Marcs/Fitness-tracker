@@ -271,47 +271,62 @@ async def update_schedule_entry(entry_id: str, payload: dict):
 
 # --- Workouts (existing) ---
 
-@app.get("/api/workouts/week-summary")
-async def get_week_summary():
-    from datetime import timedelta
-    today = datetime.utcnow()
-    seven_days_ago = today - timedelta(days=6)
-    filter_data = {
-        "filter": {
-            "property": "Date",
-            "date": {"on_or_after": seven_days_ago.strftime("%Y-%m-%d")}
-        }
-    }
-    results = await query_db(NOTION_WORKOUT_DB, filter_data)
+from datetime import timedelta
+
+@app.get("/api/workouts/progress")
+async def get_progress():
+    results = await query_db(NOTION_WORKOUT_DB)
     
-    # Initialize a dictionary to hold raw volumes for each day
-    raw_volumes = {seven_days_ago + timedelta(days=i): 0 for i in range(7)}
-    
-    # Calculate raw volume for each workout entry
+    total_volume = 0.0
+    volume_by_week = {}
+    prs = {}
+
     for workout in results:
         properties = workout["properties"]
-        date_str = properties["Date"]["date"]["start"].split('T')[0]
+        exercise_name = properties["Exercise"]["title"][0]["plain_text"] if properties["Exercise"]["title"] else ""
         sets = properties["Sets"]["number"] or 0
         reps = properties["Reps"]["number"] or 0
         weight_kg = properties["Weight (kg)"]["number"] or 0.0
-        raw_volumes[datetime.strptime(date_str, "%Y-%m-%d")] += sets * reps * weight_kg
+        date_str = properties["Date"]["date"]["start"].split('T')[0]
+        workout_date = datetime.strptime(date_str, "%Y-%m-%d")
+        
+        # Calculate total volume
+        raw_volume = sets * reps * weight_kg
+        total_volume += raw_volume
+        
+        # Calculate volume by week
+        year, week, _ = workout_date.isocalendar()
+        if (year, week) not in volume_by_week:
+            volume_by_week[(year, week)] = 0.0
+        volume_by_week[(year, week)] += raw_volume
+        
+        # Track PRs for each exercise
+        if exercise_name not in prs or weight_kg > prs[exercise_name]["value"]:
+            prs[exercise_name] = {
+                "name": exercise_name,
+                "value": weight_kg,
+                "date": workout_date.strftime("%b %d")
+            }
     
-    # Calculate max raw volume
-    max_raw_volume = max(raw_volumes.values())
+    # Sort and limit volume_by_week to the last 8 weeks
+    sorted_volume_by_week = sorted(volume_by_week.items(), key=lambda x: (x[0][0], x[0][1]))
+    recent_volume_by_week = sorted_volume_by_week[-8:]
+    formatted_volume_by_week = [
+        {"week": datetime.fromisocalendar(year, week, 1).strftime("%b %d"), "value": value}
+        for (_, week), value in recent_volume_by_week
+    ]
     
-    # Build the summary list
-    week_summary = []
-    for i in range(7):
-        day_date = seven_days_ago + timedelta(days=i)
-        day_of_week = day_date.strftime("%a")[0]  # Get single-letter weekday abbreviation
-        raw_volume = raw_volumes[day_date]
-        value = int(round((raw_volume / max_raw_volume) * 100)) if max_raw_volume > 0 else 0
-        week_summary.append({"day": day_of_week, "value": value})
+    # Sort and limit PRs to the top 5 exercises by max weight
+    sorted_prs = sorted(prs.values(), key=lambda x: x["value"], reverse=True)[:5]
     
-    return week_summary
+    return {
+        "total_volume": total_volume,
+        "volume_by_week": formatted_volume_by_week,
+        "prs": sorted_prs
+    }
 
-@app.get("/api/workouts")
-async def get_workouts():
+@app.get("/api/workouts/week-summary")
+async def get_week_summary():
     url = f"https://api.notion.com/v1/databases/{NOTION_WORKOUT_DB}/query"
     return await notion_request("POST", url)
 
