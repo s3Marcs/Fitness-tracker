@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 /*
  * PlansPage
@@ -140,9 +140,8 @@ function ProgramCard({ program }) {
 export default function PlansPage({
   plans = STUB_PLANS,
   programs = STUB_PROGRAMS,
-  onAddPlan,
-  onAddProg,
 }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('PLANS');
 
   return (
@@ -182,7 +181,7 @@ export default function PlansPage({
           ))}
 
           <button
-            onClick={() => onAddPlan?.()}
+            onClick={() => navigate('/plans/new')}
             className="w-full border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors mt-2"
           >
             <span className="material-symbols-outlined text-on-surface-variant text-sm">add</span>
@@ -201,7 +200,7 @@ export default function PlansPage({
           ))}
 
           <button
-            onClick={() => onAddProg?.()}
+            onClick={() => navigate('/plans/programs/new')}
             className="w-full border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors mt-2"
           >
             <span className="material-symbols-outlined text-on-surface-variant text-sm">add</span>

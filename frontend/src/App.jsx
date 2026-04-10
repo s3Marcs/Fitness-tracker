@@ -12,6 +12,8 @@ import OneRMCalcPage from './pages/OneRMCalcPage';
 import WorkoutsPage from './pages/WorkoutsPage';
 import PlansPage from './pages/PlansPage';
 import WorkoutSummaryPage from './pages/WorkoutSummaryPage';
+import NewPlanPage from './pages/NewPlanPage';
+import NewProgramPage from './pages/NewProgramPage';
 
 // ---------------------------------------------------------------------------
 // Placeholder pages — replace with real components as they are built
@@ -50,9 +52,11 @@ export default function App() {
           <Route path="/workouts/active" element={<WorkoutsPage />} />
           <Route path="/workouts/:id" element={<WorkoutSummaryPage />} />
           <Route path="/workouts" element={<WorkoutsPage />} />
-          <Route path="/plans/programs/:id" element={<PlaceholderPage title="Program Detail" />} />
-          <Route path="/plans/:id" element={<PlaceholderPage title="Plan Detail" />} />
           <Route path="/plans" element={<PlansPage />} />
+          <Route path="/plans/new" element={<NewPlanPage />} />
+          <Route path="/plans/:id" element={<PlaceholderPage title="Plan Detail" />} />
+          <Route path="/plans/programs/new" element={<NewProgramPage />} />
+          <Route path="/plans/programs/:id" element={<PlaceholderPage title="Program Detail" />} />
           <Route path="/1rm-calc" element={<OneRMCalcPage />} />
 
           {/* Legacy routes — remove as pages are rebuilt */}
