@@ -67,6 +67,19 @@ async def lifespan(app: FastAPI):
     run_migrations()
     yield
 
+def run_migrations():
+    migrations = [
+        "ALTER TABLE program_exercises ADD COLUMN default_weight_kg REAL NOT NULL DEFAULT 0",
+    ]
+    with engine.connect() as conn:
+        conn.execute(text("PRAGMA foreign_keys = ON"))
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists — safe to ignore
+
 def get_conn():
     conn = engine.connect()
     conn.execute(text("PRAGMA foreign_keys = ON"))
@@ -82,6 +95,7 @@ async def lifespan(app: FastAPI):
             if s:
                 conn.execute(text(s))
         conn.commit()
+    run_migrations()
     yield
 
 app = FastAPI(lifespan=lifespan)
