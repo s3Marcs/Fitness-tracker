@@ -130,6 +130,19 @@ async def get_programs():
         routines.append({"id": r["id"], "name": name})
     return routines
 
+@app.get("/api/programs/{program_id}")
+async def get_program(program_id: str):
+    url = f"https://api.notion.com/v1/pages/{program_id}"
+    result = await notion_request("GET", url)
+    props = result["properties"]
+    name = props["Name"]["title"][0]["plain_text"] if props["Name"]["title"] else ""
+    return {"id": result["id"], "name": name}
+
+@app.delete("/api/programs/{program_id}", status_code=204)
+async def delete_program(program_id: str):
+    url = f"https://api.notion.com/v1/pages/{program_id}"
+    await notion_request("PATCH", url, data={"archived": True})
+
 @app.post("/api/programs", status_code=201)
 async def create_program(payload: dict):
     url = "https://api.notion.com/v1/pages"
