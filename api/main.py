@@ -165,6 +165,10 @@ async def delete_program(program_id: str):
             {"id": program_id}
         )
         conn.execute(
+            text("UPDATE plans SET program_id = NULL WHERE program_id = :id"),
+            {"id": program_id}
+        )
+        conn.execute(
             text("DELETE FROM programs WHERE id = :id"),
             {"id": program_id}
         )
