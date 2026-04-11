@@ -151,7 +151,7 @@ export default function WorkoutsPage() {
               })
           );
       })
-      .catch(()an => {})
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
