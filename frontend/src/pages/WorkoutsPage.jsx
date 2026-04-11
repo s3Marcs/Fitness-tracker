@@ -103,22 +103,6 @@ function ExerciseBlock({ exercise, onUpdateSet }) {
   );
 }
 
-function apiExerciseToWorkoutExercise(ex, exerciseLibrary) {
-  const libEntry = exerciseLibrary[ex.exercise_id];
-  const weight = ex.last_weight_kg ?? ex.default_weight_kg ?? 0;
-  return {
-    id: ex.id,
-    name: ex.name,
-    exercise_id: ex.exercise_id,
-    muscleGroup: libEntry?.muscle_group ?? ex.muscle_group ?? 'General',
-    sets: Array.from({ length: ex.default_sets || 3 }, () => ({
-      weight,
-      reps: 0,
-      done: false,
-    })),
-  };
-}
-
 export default function WorkoutsPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -167,7 +151,7 @@ export default function WorkoutsPage() {
               })
           );
       })
-      .catch(() => {})
+      .catch(()an => {})
       .finally(() => setLoading(false));
   }, []);
 
