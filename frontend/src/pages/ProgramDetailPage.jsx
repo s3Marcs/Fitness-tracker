@@ -83,12 +83,16 @@ function ExerciseRow({ ex, index, editMode, onDelete }) {
           <p className="text-sm font-bold text-white font-body">
             {ex.default_sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
           </p>
+          {ex.default_weight_kg > 0 && (
+            <p className="text-sm font-bold text-white font-body">
+              {ex.default_weight_kg}<span className="text-[9px] text-on-surface-variant ml-1">kg</span>
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
-  // Edit mode — swipe to delete
   return (
     <div className="relative mb-2 overflow-hidden">
       <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
@@ -107,6 +111,11 @@ function ExerciseRow({ ex, index, editMode, onDelete }) {
           <p className="text-sm font-bold text-white font-body">
             {ex.default_sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
           </p>
+          {ex.default_weight_kg > 0 && (
+            <p className="text-sm font-bold text-white font-body">
+              {ex.default_weight_kg}<span className="text-[9px] text-on-surface-variant ml-1">kg</span>
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -175,7 +184,6 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
     <div className="bg-surface-container-low p-4 mt-4">
       <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">Add Exercise</p>
 
-      {/* Search */}
       <div className="bg-surface-container border-b border-outline focus-within:border-primary transition-colors px-3 py-2 mb-3">
         <input
           type="text"
@@ -186,7 +194,6 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
         />
       </div>
 
-      {/* Results list */}
       {search && !selectedId && (
         <div className="mb-3 max-h-48 overflow-y-auto">
           {filtered.length === 0 && (
@@ -210,12 +217,10 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
         </div>
       )}
 
-      {/* Default sets + weight + confirm */}
       {selectedId && (
         <div className="mt-2 space-y-3">
-          {/* Sets row */}
           <div className="flex items-center gap-3">
-            <p className="text-[9px] text-on-surface-variant uppercase font-headline w-16">Default sets</p>
+            <p className="text-[9px] text-on-surface-variant uppercase font-headline w-20">Default sets</p>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setDefaultSets((s) => Math.max(1, s - 1))}
@@ -233,9 +238,8 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
             </div>
           </div>
 
-          {/* Weight row */}
           <div className="flex items-center gap-3">
-            <p className="text-[9px] text-on-surface-variant uppercase font-headline w-16">Default weight</p>
+            <p className="text-[9px] text-on-surface-variant uppercase font-headline w-20">Default weight</p>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setDefaultWeight((w) => Math.max(0, parseFloat((w - 2.5).toFixed(1))))}
@@ -254,7 +258,6 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
             </div>
           </div>
 
-          {/* Add button */}
           <div className="flex justify-end">
             <button
               onClick={handleAdd}
@@ -344,7 +347,6 @@ export default function ProgramDetailPage() {
 
   return (
     <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}
@@ -372,20 +374,17 @@ export default function ProgramDetailPage() {
         </button>
       </div>
 
-      {/* Exercise count */}
       <div className="bg-surface-container-low p-3 mb-4">
         <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Exercises</p>
         <p className="text-xl font-black text-white font-body tracking-tighter">{exercises.length}</p>
       </div>
 
-      {/* Edit mode hint */}
       {editMode && (
         <p className="text-[10px] text-on-surface-variant font-headline uppercase mb-3">
           Swipe left on an exercise to remove it
         </p>
       )}
 
-      {/* Exercise list */}
       {exercises.length === 0 && (
         <p className="text-on-surface-variant text-sm font-body mb-4">No exercises yet.</p>
       )}
@@ -399,7 +398,6 @@ export default function ProgramDetailPage() {
         />
       ))}
 
-      {/* Add exercise panel — only in edit mode */}
       {editMode && (
         <AddExercisePanel
           programId={id}
@@ -408,7 +406,6 @@ export default function ProgramDetailPage() {
         />
       )}
 
-      {/* Delete program — only in edit mode */}
       {editMode && (
         <div className="mt-6">
           {confirmDelete ? (
