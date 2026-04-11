@@ -64,9 +64,32 @@ function useSwipeToDelete(onDelete) {
   return ref;
 }
 
-function ExerciseRow({ ex, index, editMode, onDelete }) {
+function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated }) {
   const ref = useSwipeToDelete(onDelete);
   const colors = getMuscleColor(ex.muscle_group);
+  const [expanded, setExpanded] = useState(false);
+  const [sets, setSets] = useState(ex.default_sets);
+  const [weight, setWeight] = useState(ex.default_weight_kg || 0);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/programs/${programId}/exercises/${ex.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_sets: sets, default_weight_kg: weight }),
+      });
+      if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
+      onUpdated(ex.id, { default_sets: sets, default_weight_kg: weight });
+      setExpanded(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update exercise.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!editMode) {
     return (
@@ -98,25 +121,88 @@ function ExerciseRow({ ex, index, editMode, onDelete }) {
       <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
         <span className="material-symbols-outlined text-on-error">delete</span>
       </div>
-      <div ref={ref} className="relative bg-surface-container-low p-3 flex items-center gap-3">
-        <span className="material-symbols-outlined text-on-surface-variant text-sm mr-1">drag_indicator</span>
-        <div className="flex-1">
-          <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
-            {ex.muscle_group || 'General'}
-          </span>
-          <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{ex.name}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[9px] text-on-surface-variant uppercase font-headline">Default</p>
-          <p className="text-sm font-bold text-white font-body">
-            {ex.default_sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
-          </p>
-          {ex.default_weight_kg > 0 && (
+      <div ref={ref} className="relative bg-surface-container-low">
+        <div
+          className="p-3 flex items-center gap-3 cursor-pointer"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          <span className="material-symbols-outlined text-on-surface-variant text-sm mr-1">drag_indicator</span>
+          <div className="flex-1">
+            <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
+              {ex.muscle_group || 'General'}
+            </span>
+            <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{ex.name}</p>
+          </div>
+          <div className="text-right mr-2">
+            <p className="text-[9px] text-on-surface-variant uppercase font-headline">Default</p>
             <p className="text-sm font-bold text-white font-body">
-              {ex.default_weight_kg}<span className="text-[9px] text-on-surface-variant ml-1">kg</span>
+              {sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
             </p>
-          )}
+            {weight > 0 && (
+              <p className="text-sm font-bold text-white font-body">
+                {weight}<span className="text-[9px] text-on-surface-variant ml-1">kg</span>
+              </p>
+            )}
+          </div>
+          <span className="material-symbols-outlined text-on-surface-variant text-sm">
+            {expanded ? 'expand_less' : 'expand_more'}
+          </span>
         </div>
+
+        {expanded && (
+          <div className="px-3 pb-3 border-t border-outline-variant/10 pt-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <p className="text-[9px] text-on-surface-variant uppercase font-headline w-20">Default sets</p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setSets((s) => Math.max(1, s - 1))}
+                  className="w-7 h-7 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant">remove</span>
+                </button>
+                <span className="text-white font-bold font-body w-6 text-center">{sets}</span>
+                <button
+                  onClick={() => setSets((s) => s + 1)}
+                  className="w-7 h-7 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant">add</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <p className="text-[9px] text-on-surface-variant uppercase font-headline w-20">Default weight</p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setWeight((w) => Math.max(0, parseFloat((w - 2.5).toFixed(1))))}
+                  className="w-7 h-7 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant">remove</span>
+                </button>
+                <span className="text-white font-bold font-body w-10 text-center">{weight}</span>
+                <button
+                  onClick={() => setWeight((w) => parseFloat((w + 2.5).toFixed(1)))}
+                  className="w-7 h-7 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant">add</span>
+                </button>
+                <span className="text-[9px] text-on-surface-variant uppercase font-headline ml-1">KG</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-primary px-4 py-2 hover:bg-primary-container transition-colors disabled:opacity-50"
+              >
+                <span className="text-on-primary text-xs font-black tracking-widest font-headline uppercase">
+                  {saving ? '...' : 'Save'}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -309,6 +395,12 @@ export default function ProgramDetailPage() {
     }
   }
 
+  function handleExerciseUpdated(exerciseRowId, changes) {
+    setExercises((prev) =>
+      prev.map((e) => (e.id === exerciseRowId ? { ...e, ...changes } : e))
+    );
+  }
+
   async function handleDeleteProgram() {
     setDeleting(true);
     try {
@@ -381,7 +473,7 @@ export default function ProgramDetailPage() {
 
       {editMode && (
         <p className="text-[10px] text-on-surface-variant font-headline uppercase mb-3">
-          Swipe left on an exercise to remove it
+          Tap exercise to edit defaults — swipe left to remove
         </p>
       )}
 
@@ -393,8 +485,10 @@ export default function ProgramDetailPage() {
           key={ex.id}
           ex={ex}
           index={i}
+          programId={id}
           editMode={editMode}
           onDelete={() => handleDeleteExercise(ex.id)}
+          onUpdated={handleExerciseUpdated}
         />
       ))}
 

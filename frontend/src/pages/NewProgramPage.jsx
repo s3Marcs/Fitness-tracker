@@ -1,82 +1,167 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-/*
- * NewProgramPage
- *
- * Endpoints:
- *   exercises <- GET /api/exercises           → [{ id, name, muscle_group }]
- *   onSave    -> POST /api/programs           ← { name }          → { id }
- *             -> POST /api/programs/{id}/exercises (one per exercise, in order)
- *                                             ← { program_id, exercise_id, default_sets, order }
- */
+const MUSCLE_COLORS = {
+  'Chest':     { bg: 'bg-blue-900/40',    text: 'text-blue-300' },
+  'Back':      { bg: 'bg-emerald-900/40', text: 'text-emerald-300' },
+  'Shoulders': { bg: 'bg-violet-900/40',  text: 'text-violet-300' },
+  'Biceps':    { bg: 'bg-cyan-900/40',    text: 'text-cyan-300' },
+  'Triceps':   { bg: 'bg-orange-900/40',  text: 'text-orange-300' },
+  'Legs':      { bg: 'bg-yellow-900/40',  text: 'text-yellow-300' },
+  'Core':      { bg: 'bg-rose-900/40',    text: 'text-rose-300' },
+};
+const DEFAULT_MUSCLE_COLOR = { bg: 'bg-surface-container-highest', text: 'text-on-surface-variant' };
 
-function ExerciseRow({ index, exerciseId, exercises, onChange, onRemove }) {
+function getMuscleColor(mg) {
+  return MUSCLE_COLORS[mg] ?? DEFAULT_MUSCLE_COLOR;
+}
+
+function ExerciseEntry({ index, entry, allExercises, usedIds, onChange, onRemove }) {
+  const [search, setSearch] = useState(entry.name || '');
+  const [showResults, setShowResults] = useState(false);
+
+  const filtered = allExercises
+    .filter((e) => !usedIds.has(e.id) || e.id === entry.exerciseId)
+    .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
+
+  function selectExercise(ex) {
+    setSearch(ex.name);
+    setShowResults(false);
+    onChange(index, { ...entry, exerciseId: ex.id, name: ex.name, muscleGroup: ex.muscle_group });
+  }
+
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-[10px] text-on-surface-variant font-headline w-5 text-right">
-        {String(index + 1).padStart(2, '0')}
-      </span>
-      <div className="flex-1 bg-surface-container border-b border-outline focus-within:border-primary transition-colors">
-        <select
-          value={exerciseId}
-          onChange={(e) => onChange(index, e.target.value)}
-          className="w-full bg-transparent text-white text-sm font-bold font-body outline-none px-2 py-2 appearance-none cursor-pointer"
+    <div className="bg-surface-container mb-3 p-3">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[10px] text-on-surface-variant font-headline w-5 text-right shrink-0">
+          {String(index + 1).padStart(2, '0')}
+        </span>
+        <div className="flex-1 relative">
+          <div className="bg-surface-container-low border-b border-outline focus-within:border-primary transition-colors px-2 py-1.5">
+            <input
+              type="text"
+              placeholder="Search exercise..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShowResults(true);
+                if (!e.target.value) onChange(index, { ...entry, exerciseId: '', name: '', muscleGroup: '' });
+              }}
+              onFocus={() => setShowResults(true)}
+              className="w-full bg-transparent text-white text-sm font-body outline-none placeholder:text-on-surface-variant/40"
+            />
+          </div>
+          {showResults && search && !entry.exerciseId && (
+            <div className="absolute z-10 left-0 right-0 bg-surface-container-high max-h-40 overflow-y-auto border border-outline-variant/30">
+              {filtered.length === 0 && (
+                <p className="text-on-surface-variant text-xs font-body px-3 py-2">No matches.</p>
+              )}
+              {filtered.map((ex) => {
+                const colors = getMuscleColor(ex.muscle_group);
+                return (
+                  <button
+                    key={ex.id}
+                    onClick={() => selectExercise(ex)}
+                    className="w-full text-left px-3 py-2 hover:bg-surface-container transition-colors flex items-center gap-2"
+                  >
+                    <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase font-headline shrink-0`}>
+                      {ex.muscle_group || 'General'}
+                    </span>
+                    <span className="text-sm font-black text-white uppercase font-headline tracking-tight">{ex.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => onRemove(index)}
+          className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-error transition-colors shrink-0"
         >
-          <option value="" className="bg-surface-container text-on-surface-variant">
-            Select exercise...
-          </option>
-          {exercises.map((ex) => (
-            <option key={ex.id} value={ex.id} className="bg-surface-container text-white">
-              {ex.name}
-            </option>
-          ))}
-        </select>
+          <span className="material-symbols-outlined text-sm">close</span>
+        </button>
       </div>
-      <button
-        onClick={() => onRemove(index)}
-        className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-tertiary transition-colors"
-      >
-        <span className="material-symbols-outlined text-sm">close</span>
-      </button>
+
+      {entry.exerciseId && (
+        <div className="flex items-center gap-4 pl-7">
+          {/* Sets stepper */}
+          <div className="flex items-center gap-1">
+            <p className="text-[9px] text-on-surface-variant uppercase font-headline mr-1">Sets</p>
+            <button
+              onClick={() => onChange(index, { ...entry, defaultSets: Math.max(1, entry.defaultSets - 1) })}
+              className="w-6 h-6 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container-low transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs text-on-surface-variant">remove</span>
+            </button>
+            <span className="text-white font-bold font-body w-5 text-center text-sm">{entry.defaultSets}</span>
+            <button
+              onClick={() => onChange(index, { ...entry, defaultSets: entry.defaultSets + 1 })}
+              className="w-6 h-6 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container-low transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs text-on-surface-variant">add</span>
+            </button>
+          </div>
+
+          {/* Weight stepper */}
+          <div className="flex items-center gap-1">
+            <p className="text-[9px] text-on-surface-variant uppercase font-headline mr-1">Weight</p>
+            <button
+              onClick={() => onChange(index, { ...entry, defaultWeight: Math.max(0, parseFloat((entry.defaultWeight - 2.5).toFixed(1))) })}
+              className="w-6 h-6 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container-low transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs text-on-surface-variant">remove</span>
+            </button>
+            <span className="text-white font-bold font-body w-10 text-center text-sm">{entry.defaultWeight}</span>
+            <button
+              onClick={() => onChange(index, { ...entry, defaultWeight: parseFloat((entry.defaultWeight + 2.5).toFixed(1)) })}
+              className="w-6 h-6 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container-low transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs text-on-surface-variant">add</span>
+            </button>
+            <span className="text-[9px] text-on-surface-variant uppercase font-headline ml-1">KG</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function NewProgramPage() {
   const navigate = useNavigate();
-  const [exercises, setExercises] = useState([]);
+  const [allExercises, setAllExercises] = useState([]);
   const [programName, setProgramName] = useState('');
-  const [rows, setRows] = useState([{ exerciseId: '' }]);
+  const [entries, setEntries] = useState([{ exerciseId: '', name: '', muscleGroup: '', defaultSets: 3, defaultWeight: 0 }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetch('/api/exercises')
       .then((r) => r.json())
-      .then((data) => setExercises(Array.isArray(data) ? data : []))
+      .then((data) => setAllExercises(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
-  function handleChangeRow(index, exerciseId) {
-    setRows((prev) => prev.map((r, i) => (i === index ? { exerciseId } : r)));
+  function handleChangeEntry(index, updated) {
+    setEntries((prev) => prev.map((e, i) => (i === index ? updated : e)));
   }
 
-  function handleRemoveRow(index) {
-    setRows((prev) => prev.filter((_, i) => i !== index));
+  function handleRemoveEntry(index) {
+    setEntries((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleAddRow() {
-    setRows((prev) => [...prev, { exerciseId: '' }]);
+  function handleAddEntry() {
+    setEntries((prev) => [...prev, { exerciseId: '', name: '', muscleGroup: '', defaultSets: 3, defaultWeight: 0 }]);
   }
+
+  const usedIds = new Set(entries.map((e) => e.exerciseId).filter(Boolean));
+  const filled = entries.filter((e) => e.exerciseId !== '');
+  const canSave = programName.trim().length > 0 && filled.length > 0;
 
   async function handleSave() {
-    const filled = rows.filter((r) => r.exerciseId !== '');
-    if (!programName.trim() || filled.length === 0) return;
+    if (!canSave) return;
     setSaving(true);
     setError(null);
     try {
-      // 1. Create the program
       const programRes = await fetch('/api/programs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,7 +170,6 @@ export default function NewProgramPage() {
       if (!programRes.ok) throw new Error(`HTTP ${programRes.status}`);
       const { id: programId } = await programRes.json();
 
-      // 2. Add each exercise in order (sequential — avoids Notion rate limiting)
       for (let i = 0; i < filled.length; i++) {
         const res = await fetch(`/api/programs/${programId}/exercises`, {
           method: 'POST',
@@ -93,14 +177,15 @@ export default function NewProgramPage() {
           body: JSON.stringify({
             program_id: programId,
             exercise_id: filled[i].exerciseId,
-            default_sets: 3,
+            default_sets: filled[i].defaultSets,
+            default_weight_kg: filled[i].defaultWeight,
             order: i + 1,
           }),
         });
         if (!res.ok) throw new Error(`Failed to add exercise ${i + 1}: HTTP ${res.status}`);
       }
 
-      navigate('/plans');
+      navigate(`/plans/programs/${programId}`);
     } catch (e) {
       setError(e.message || 'Failed to save program. Please try again.');
     } finally {
@@ -108,22 +193,17 @@ export default function NewProgramPage() {
     }
   }
 
-  const canSave =
-    programName.trim().length > 0 && rows.some((r) => r.exerciseId !== '');
-
   return (
     <main
       className="pb-24 px-4 max-w-7xl mx-auto"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}
     >
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white">
           New Program
         </h1>
       </div>
 
-      {/* Program name */}
       <div className="bg-surface-container-low p-4 mb-4">
         <p className="text-[10px] text-primary font-bold tracking-tighter mb-3 uppercase font-headline">
           Program Name
@@ -139,45 +219,36 @@ export default function NewProgramPage() {
         </div>
       </div>
 
-      {/* Add exercises */}
       <div className="bg-surface-container-low p-4 mb-4">
         <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
-          Add Exercises
+          Exercises
         </p>
-
-        {exercises.length === 0 && (
-          <p className="text-on-surface-variant text-sm font-body mb-3">
-            No exercises available. Add exercises to the Exercises DB in Notion first.
-          </p>
-        )}
-
-        {rows.map((row, i) => (
-          <ExerciseRow
+        {entries.map((entry, i) => (
+          <ExerciseEntry
             key={i}
             index={i}
-            exerciseId={row.exerciseId}
-            exercises={exercises}
-            onChange={handleChangeRow}
-            onRemove={handleRemoveRow}
+            entry={entry}
+            allExercises={allExercises}
+            usedIds={usedIds}
+            onChange={handleChangeEntry}
+            onRemove={handleRemoveEntry}
           />
         ))}
-
         <button
-          onClick={handleAddRow}
-          className="w-full border border-outline-variant/30 py-2 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors mt-3"
+          onClick={handleAddEntry}
+          className="w-full border border-outline-variant/30 py-2 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors mt-2"
         >
           <span className="material-symbols-outlined text-on-surface-variant text-sm">add</span>
           <span className="text-on-surface-variant text-xs font-black tracking-[0.15em] font-headline uppercase">
-            Add Another Exercise
+            Add Exercise
           </span>
         </button>
       </div>
 
       {error && (
-        <p className="text-red-400 text-sm font-body mb-4">{error}</p>
+        <p className="text-error text-sm font-body mb-4">{error}</p>
       )}
 
-      {/* Save */}
       <button
         onClick={handleSave}
         disabled={!canSave || saving}
@@ -187,11 +258,7 @@ export default function NewProgramPage() {
             : 'bg-surface-container-highest cursor-not-allowed'
         }`}
       >
-        <span
-          className={`text-sm font-black tracking-[0.2em] font-headline uppercase ${
-            canSave && !saving ? 'text-on-primary' : 'text-on-surface-variant'
-          }`}
-        >
+        <span className={`text-sm font-black tracking-[0.2em] font-headline uppercase ${canSave && !saving ? 'text-on-primary' : 'text-on-surface-variant'}`}>
           {saving ? 'Saving...' : 'Save Program'}
         </span>
         {canSave && !saving && (

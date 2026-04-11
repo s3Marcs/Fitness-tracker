@@ -235,6 +235,29 @@ async def get_program_exercises(program_id: str):
         for r in rows
     ]
 
+class ProgramExerciseUpdateInput(BaseModel):
+    default_sets: int
+    default_weight_kg: float = 0
+
+@app.put("/api/programs/{program_id}/exercises/{exercise_id}", status_code=200)
+async def update_program_exercise(program_id: str, exercise_id: str, payload: ProgramExerciseUpdateInput):
+    with get_conn() as conn:
+        conn.execute(
+            text("""
+                UPDATE program_exercises
+                SET default_sets = :default_sets, default_weight_kg = :default_weight_kg
+                WHERE id = :id AND program_id = :program_id
+            """),
+            {
+                "id": exercise_id,
+                "program_id": program_id,
+                "default_sets": payload.default_sets,
+                "default_weight_kg": payload.default_weight_kg,
+            }
+        )
+        conn.commit()
+    return {"ok": True}
+    
 @app.post("/api/programs/{program_id}/exercises", status_code=201)
 async def add_program_exercise(program_id: str, payload: ProgramExerciseInput):
     peid = str(uuid.uuid4())
