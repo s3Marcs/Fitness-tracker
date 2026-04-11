@@ -1,13 +1,81 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const TABS = ['PLANS', 'PROGRAMS'];
 
-function PlanCard({ plan, programName }) {
+function useSwipeToDelete(onDelete) {
+  const ref = useRef(null);
+  const startX = useRef(0);
+  const currentX = useRef(0);
+  const swiped = useRef(false);
+  const THRESHOLD = 80;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    function onTouchStart(e) {
+      startX.current = e.touches[0].clientX;
+      currentX.current = 0;
+      swiped.current = false;
+      el.style.transition = 'none';
+    }
+
+    function onTouchMove(e) {
+      const delta = e.touches[0].clientX - startX.current;
+      if (delta > 0) return; // only left swipe
+      currentX.current = delta;
+      el.style.transform = `translateX(${Math.max(delta, -100)}px)`;
+    }
+
+    function onTouchEnd() {
+      if (currentX.current < -THRESHOLD) {
+        swiped.current = true;
+        el.style.transition = 'transform 0.2s ease';
+        el.style.transform = 'translateX(-100%)';
+        setTimeout(() => onDelete(), 200);
+      } else {
+        el.style.transition = 'transform 0.2s ease';
+        el.style.transform = 'translateX(0)';
+      }
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [onDelete]);
+
+  return { ref, didSwipe: () => swiped.current };
+}
+
+function PlanCard({ plan, programName, onDelete }) {
+  const navigate = useNavigate();
+  const { ref, didSwipe } = useSwipeToDelete(onDelete);
+
+  function handleClick() {
+    if (didSwipe()) return;
+    navigate(`/plans/${plan.id}`);
+  }
+
   return (
-    <div className="bg-surface-container-low p-4 mb-3">
-      <div className="flex justify-between items-start mb-3">
-        <div>
+    <div className="relative mb-3 overflow-hidden">
+      {/* Red delete strip behind */}
+      <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
+        <span className="material-symbols-outlined text-on-error">delete</span>
+      </div>
+      {/* Card */}
+      <div
+        ref={ref}
+        onClick={handleClick}
+        className="relative bg-surface-container-low p-4 cursor-pointer hover:bg-surface-container transition-colors"
+      >
+        <div className="mb-3">
           <span className="bg-surface-container-highest text-secondary text-[9px] font-bold px-1.5 py-0.5 uppercase mb-2 inline-block font-headline">
             {plan.day || 'NO DAY SET'}
           </span>
@@ -15,92 +83,39 @@ function PlanCard({ plan, programName }) {
             {plan.name}
           </h3>
         </div>
-        <Link
-          to={`/plans/${plan.id}`}
-          className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-primary/10 transition-colors"
-        >
-          <span className="material-symbols-outlined text-sm text-on-surface-variant">
-            chevron_right
-          </span>
-        </Link>
-      </div>
-
-      <div className="bg-surface-container p-2">
-        <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
-          Program
-        </p>
-        <p className="text-xs text-white font-bold font-body">
-          {programName || '—'}
-        </p>
+        <div className="bg-surface-container p-2">
+          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Program</p>
+          <p className="text-xs text-white font-bold font-body">{programName || '—'}</p>
+        </div>
       </div>
     </div>
   );
 }
 
 function ProgramCard({ program, onDelete }) {
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
+  const { ref, didSwipe } = useSwipeToDelete(onDelete);
 
-  async function handleDelete() {
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/programs/${program.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
-      onDelete(program.id);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete program.');
-    } finally {
-      setDeleting(false);
-      setConfirming(false);
-    }
+  function handleClick() {
+    if (didSwipe()) return;
+    navigate(`/plans/programs/${program.id}`);
   }
 
   return (
-    <div className="bg-surface-container-low p-4 mb-3">
-      <div className="flex justify-between items-center">
+    <div className="relative mb-3 overflow-hidden">
+      {/* Red delete strip behind */}
+      <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
+        <span className="material-symbols-outlined text-on-error">delete</span>
+      </div>
+      {/* Card */}
+      <div
+        ref={ref}
+        onClick={handleClick}
+        className="relative bg-surface-container-low p-4 cursor-pointer hover:bg-surface-container transition-colors"
+      >
         <h3 className="text-base font-black text-white uppercase font-headline tracking-tight">
           {program.name}
         </h3>
-        <div className="flex gap-2">
-          {confirming ? (
-            <>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-3 h-8 bg-error flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-50"
-              >
-                <span className="text-on-error text-[10px] font-black tracking-widest font-headline uppercase">
-                  {deleting ? '...' : 'Confirm'}
-                </span>
-              </button>
-              <button
-                onClick={() => setConfirming(false)}
-                disabled={deleting}
-                className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm text-on-surface-variant">close</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => setConfirming(true)}
-                className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-error/10 hover:border-error/40 transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm text-on-surface-variant">delete</span>
-              </button>
-              <Link
-                to={`/plans/programs/${program.id}`}
-                className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-primary/10 transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm text-on-surface-variant">
-                  chevron_right
-                </span>
-              </Link>
-            </>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -126,8 +141,26 @@ export default function PlansPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleProgramDeleted(id) {
-    setPrograms((prev) => prev.filter((p) => p.id !== id));
+  async function handleDeletePlan(id) {
+    try {
+      const res = await fetch(`/api/plans/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
+      setPlans((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete plan.');
+    }
+  }
+
+  async function handleDeleteProgram(id) {
+    try {
+      const res = await fetch(`/api/programs/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
+      setPrograms((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete program.');
+    }
   }
 
   const programMap = Object.fromEntries(programs.map((p) => [p.id, p.name]));
@@ -169,7 +202,12 @@ export default function PlansPage() {
             <p className="text-on-surface-variant text-sm font-body mb-4">No plans yet.</p>
           )}
           {plans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} programName={programMap[plan.program_id]} />
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              programName={programMap[plan.program_id]}
+              onDelete={() => handleDeletePlan(plan.id)}
+            />
           ))}
           <button
             onClick={() => navigate('/plans/new')}
@@ -189,7 +227,11 @@ export default function PlansPage() {
             <p className="text-on-surface-variant text-sm font-body mb-4">No programs yet.</p>
           )}
           {programs.map((program) => (
-            <ProgramCard key={program.id} program={program} onDelete={handleProgramDeleted} />
+            <ProgramCard
+              key={program.id}
+              program={program}
+              onDelete={() => handleDeleteProgram(program.id)}
+            />
           ))}
           <button
             onClick={() => navigate('/plans/programs/new')}
