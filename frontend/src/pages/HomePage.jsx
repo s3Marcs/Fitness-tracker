@@ -114,44 +114,35 @@ function NextWorkoutBanner({ workout }) {
 
 function WorkoutLogCard({ log }) {
   return (
-    <div className="bg-surface-container-low mb-4">
-      <div className="p-4 border-b border-outline-variant/10">
-        <div className="flex justify-between items-start mb-2">
+    <Link to={`/workouts/${log.id}`} className="block mb-4">
+      <div className="bg-surface-container-low">
+        <div className="p-4 border-b border-outline-variant/10">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <span className="bg-secondary/10 text-secondary text-[9px] font-bold px-1.5 py-0.5 uppercase mb-2 inline-block font-headline">
+                {log.tag}
+              </span>
+              <h3 className="text-lg font-bold leading-tight font-headline text-white">{log.name}</h3>
+            </div>
+            <span className="text-[10px] text-on-surface-variant font-headline uppercase">{log.date}</span>
+          </div>
           <div>
-            <span className="bg-secondary/10 text-secondary text-[9px] font-bold px-1.5 py-0.5 uppercase mb-2 inline-block font-headline">
-              {log.tag}
-            </span>
-            <h3 className="text-lg font-bold leading-tight font-headline text-white">{log.name}</h3>
-          </div>
-          <span className="text-[10px] text-on-surface-variant font-headline uppercase">{log.date}</span>
-        </div>
-        <div>
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Total Volume</p>
-          <p className="text-xs font-bold text-white tracking-tighter font-body">
-            {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
-          </p>
-        </div>
-      </div>
-      <div className="bg-surface-container-lowest p-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-surface-container flex items-center justify-center">
-            <span className="material-symbols-outlined text-primary">fitness_center</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-[10px] text-on-surface-variant font-bold leading-none mb-1 uppercase font-headline">
-              Exercises
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Total Volume</p>
+            <p className="text-xs font-bold text-white tracking-tighter font-body">
+              {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
             </p>
+          </div>
+        </div>
+        <div className="bg-surface-container-lowest p-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-surface-container flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary">fitness_center</span>
+            </div>
             <p className="text-xs text-white/80 font-medium font-body">{log.exercises}</p>
           </div>
-          <Link
-            to={`/workouts/${log.id}`}
-            className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-primary/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm">chevron_right</span>
-          </Link>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -221,34 +212,28 @@ function ActivitiesTab({ logs }) {
         <p className="text-on-surface-variant text-sm font-body">No sessions logged yet.</p>
       )}
       {logs.map((log) => (
-        <div key={log.id} className="bg-surface-container-low p-4 mb-3">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <span className="bg-secondary/10 text-secondary text-[9px] font-bold px-1.5 py-0.5 uppercase mb-2 inline-block font-headline">
-                {log.tag}
-              </span>
-              <h3 className="text-base font-bold text-white font-headline uppercase tracking-tight">
-                {log.name}
-              </h3>
+        <Link key={log.id} to={`/workouts/${log.id}`} className="block mb-3">
+          <div className="bg-surface-container-low p-4">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <span className="bg-secondary/10 text-secondary text-[9px] font-bold px-1.5 py-0.5 uppercase mb-2 inline-block font-headline">
+                  {log.tag}
+                </span>
+                <h3 className="text-base font-bold text-white font-headline uppercase tracking-tight">
+                  {log.name}
+                </h3>
+              </div>
+              <span className="text-[10px] text-on-surface-variant font-headline uppercase">{log.date}</span>
             </div>
-            <span className="text-[10px] text-on-surface-variant font-headline uppercase">{log.date}</span>
-          </div>
-          <div className="mb-3">
-            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Volume</p>
-            <p className="text-xs font-bold text-white font-body">
-              {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
-            </p>
-          </div>
-          <div className="flex items-center justify-between">
+            <div className="mb-3">
+              <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline">Volume</p>
+              <p className="text-xs font-bold text-white font-body">
+                {log.totalVolumeKg > 0 ? `${log.totalVolumeKg.toLocaleString()} KG` : '—'}
+              </p>
+            </div>
             <p className="text-[10px] text-on-surface-variant font-body">{log.exercises}</p>
-            <Link
-              to={`/workouts/${log.id}`}
-              className="w-8 h-8 border border-outline-variant/30 flex items-center justify-center hover:bg-primary/10 transition-colors"
-            >
-              <span className="material-symbols-outlined text-sm text-on-surface-variant">chevron_right</span>
-            </Link>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );
@@ -258,7 +243,7 @@ function ActivitiesTab({ logs }) {
 // Progress tab
 // ---------------------------------------------------------------------------
 
-function VolumeChart({ data, labelKey = 'label' }) {
+function VolumeChart({ data }) {
   const maxVal = Math.max(...data.map((d) => d.value), 1);
   return (
     <div>
@@ -284,7 +269,7 @@ function VolumeChart({ data, labelKey = 'label' }) {
       <div className="flex justify-between mt-2 px-1">
         {data.map((w, i) => (
           <span key={i} className="text-[8px] text-on-surface-variant font-body truncate">
-            {w[labelKey].split(' ')[0]}
+            {w.label.split(' ')[0]}
           </span>
         ))}
       </div>
@@ -294,13 +279,11 @@ function VolumeChart({ data, labelKey = 'label' }) {
 
 function ProgressTab({ data, range, onRangeChange }) {
   const [volumeView, setVolumeView] = useState('week');
-
   const chartData = volumeView === 'week' ? data.volumeByWeek : data.volumeByMonth;
   const hasData = chartData && chartData.length > 0;
 
   return (
     <div>
-      {/* Range toggle */}
       <div className="flex gap-1 mb-4">
         {RANGE_OPTIONS.map((r) => (
           <button
@@ -317,7 +300,6 @@ function ProgressTab({ data, range, onRangeChange }) {
         ))}
       </div>
 
-      {/* Total volume stat */}
       <div className="bg-surface-container-low p-4 mb-4">
         <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">
           Total Volume — {RANGE_LABELS[range]}
@@ -330,7 +312,6 @@ function ProgressTab({ data, range, onRangeChange }) {
         </div>
       </div>
 
-      {/* Volume chart with week/month toggle */}
       <div className="bg-surface-container p-4 mb-4">
         <div className="flex justify-between items-center mb-4">
           <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline">
@@ -353,13 +334,12 @@ function ProgressTab({ data, range, onRangeChange }) {
           </div>
         </div>
         {hasData ? (
-          <VolumeChart data={chartData} labelKey="label" />
+          <VolumeChart data={chartData} />
         ) : (
           <p className="text-on-surface-variant text-sm font-body">No data for this range.</p>
         )}
       </div>
 
-      {/* Personal records */}
       {data.prs.length > 0 && (
         <div className="bg-surface-container-low p-4">
           <p className="text-[10px] text-on-surface-variant font-bold uppercase font-headline mb-3">
