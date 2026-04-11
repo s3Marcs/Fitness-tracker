@@ -483,6 +483,17 @@ async def get_plans():
         plans.append({"id": r["id"], "name": name, "day": day, "program_id": program_id})
     return plans
 
+@app.get("/api/plans/{plan_id}")
+async def get_plan(plan_id: str):
+    url = f"https://api.notion.com/v1/pages/{plan_id}"
+    result = await notion_request("GET", url)
+    props = result["properties"]
+    name = props["Name"]["title"][0]["plain_text"] if props["Name"]["title"] else ""
+    day = props["Day"]["select"]["name"] if props["Day"]["select"] else ""
+    program_relations = props["Program"]["relation"]
+    program_id = program_relations[0]["id"] if program_relations else None
+    return {"id": result["id"], "name": name, "day": day, "program_id": program_id}
+    
 @app.post("/api/plans", status_code=201)
 async def create_plan(payload: dict):
     url = "https://api.notion.com/v1/pages"
