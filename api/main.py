@@ -220,6 +220,11 @@ async def add_program_exercise(program_id: str, payload: ProgramExerciseInput):
     result = await notion_request("POST", url, data)
     return {"id": result["id"]}
 
+@app.delete("/api/programs/{program_id}/exercises/{exercise_id}", status_code=204)
+async def delete_program_exercise(program_id: str, exercise_id: str):
+    url = f"https://api.notion.com/v1/pages/{exercise_id}"
+    await notion_request("PATCH", url, data={"archived": True})
+    
 # --- Schedule ---
 
 
@@ -493,7 +498,7 @@ async def get_plan(plan_id: str):
     program_relations = props["Program"]["relation"]
     program_id = program_relations[0]["id"] if program_relations else None
     return {"id": result["id"], "name": name, "day": day, "program_id": program_id}
-    
+
 @app.post("/api/plans", status_code=201)
 async def create_plan(payload: dict):
     url = "https://api.notion.com/v1/pages"

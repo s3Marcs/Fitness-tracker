@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 const MUSCLE_COLORS = {
@@ -16,12 +16,239 @@ function getMuscleColor(mg) {
   return MUSCLE_COLORS[mg] ?? DEFAULT_MUSCLE_COLOR;
 }
 
+function useSwipeToDelete(onDelete) {
+  const ref = useRef(null);
+  const startX = useRef(0);
+  const currentX = useRef(0);
+  const swiped = useRef(false);
+  const THRESHOLD = 80;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    function onTouchStart(e) {
+      startX.current = e.touches[0].clientX;
+      currentX.current = 0;
+      swiped.current = false;
+      el.style.transition = 'none';
+    }
+    function onTouchMove(e) {
+      const delta = e.touches[0].clientX - startX.current;
+      if (delta > 0) return;
+      currentX.current = delta;
+      el.style.transform = `translateX(${Math.max(delta, -100)}px)`;
+    }
+    function onTouchEnd() {
+      if (currentX.current < -THRESHOLD) {
+        swiped.current = true;
+        el.style.transition = 'transform 0.2s ease';
+        el.style.transform = 'translateX(-100%)';
+        setTimeout(() => onDelete(), 200);
+      } else {
+        el.style.transition = 'transform 0.2s ease';
+        el.style.transform = 'translateX(0)';
+      }
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [onDelete]);
+
+  return ref;
+}
+
+function ExerciseRow({ ex, index, editMode, onDelete }) {
+  const ref = useSwipeToDelete(onDelete);
+  const colors = getMuscleColor(ex.muscle_group);
+
+  if (!editMode) {
+    return (
+      <div className="bg-surface-container-low mb-2 p-3 flex items-center gap-3">
+        <span className="text-[10px] text-on-surface-variant font-bold font-headline w-4">{index + 1}</span>
+        <div className="flex-1">
+          <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
+            {ex.muscle_group || 'General'}
+          </span>
+          <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{ex.name}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[9px] text-on-surface-variant uppercase font-headline">Default</p>
+          <p className="text-sm font-bold text-white font-body">
+            {ex.default_sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Edit mode — swipe to delete
+  return (
+    <div className="relative mb-2 overflow-hidden">
+      <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
+        <span className="material-symbols-outlined text-on-error">delete</span>
+      </div>
+      <div ref={ref} className="relative bg-surface-container-low p-3 flex items-center gap-3">
+        <span className="material-symbols-outlined text-on-surface-variant text-sm mr-1">drag_indicator</span>
+        <div className="flex-1">
+          <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
+            {ex.muscle_group || 'General'}
+          </span>
+          <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{ex.name}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[9px] text-on-surface-variant uppercase font-headline">Default</p>
+          <p className="text-sm font-bold text-white font-body">
+            {ex.default_sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddExercisePanel({ programId, existingIds, onAdded }) {
+  const [allExercises, setAllExercises] = useState([]);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [defaultSets, setDefaultSets] = useState(3);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/exercises')
+      .then((r) => r.json())
+      .then((list) => setAllExercises(Array.isArray(list) ? list : []));
+  }, []);
+
+  const filtered = allExercises
+    .filter((e) => !existingIds.has(e.id))
+    .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
+
+  const selected = allExercises.find((e) => e.id === selectedId);
+
+  async function handleAdd() {
+    if (!selectedId) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/programs/${programId}/exercises`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          program_id: programId,
+          exercise_id: selectedId,
+          default_sets: defaultSets,
+          order: 99,
+        }),
+      });
+      if (!res.ok) throw new Error(`POST failed: ${res.status}`);
+      const data = await res.json();
+      onAdded({
+        id: data.id,
+        name: selected.name,
+        exercise_id: selectedId,
+        muscle_group: selected.muscle_group,
+        default_sets: defaultSets,
+        order: 99,
+      });
+      setSelectedId('');
+      setSearch('');
+      setDefaultSets(3);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add exercise.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-surface-container-low p-4 mt-4">
+      <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">Add Exercise</p>
+
+      {/* Search */}
+      <div className="bg-surface-container border-b border-outline focus-within:border-primary transition-colors px-3 py-2 mb-3">
+        <input
+          type="text"
+          placeholder="Search exercises..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setSelectedId(''); }}
+          className="w-full bg-transparent text-white text-sm font-body outline-none placeholder:text-on-surface-variant/40"
+        />
+      </div>
+
+      {/* Results list */}
+      {search && !selectedId && (
+        <div className="mb-3 max-h-48 overflow-y-auto">
+          {filtered.length === 0 && (
+            <p className="text-on-surface-variant text-xs font-body px-1">No matches.</p>
+          )}
+          {filtered.map((ex) => {
+            const colors = getMuscleColor(ex.muscle_group);
+            return (
+              <button
+                key={ex.id}
+                onClick={() => { setSelectedId(ex.id); setSearch(ex.name); }}
+                className="w-full text-left p-2 hover:bg-surface-container transition-colors flex items-center gap-2"
+              >
+                <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase font-headline`}>
+                  {ex.muscle_group || 'General'}
+                </span>
+                <span className="text-sm text-white font-body">{ex.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Default sets + confirm */}
+      {selectedId && (
+        <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-2 flex-1">
+            <p className="text-[9px] text-on-surface-variant uppercase font-headline">Default sets</p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setDefaultSets((s) => Math.max(1, s - 1))}
+                className="w-7 h-7 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm text-on-surface-variant">remove</span>
+              </button>
+              <span className="text-white font-bold font-body w-6 text-center">{defaultSets}</span>
+              <button
+                onClick={() => setDefaultSets((s) => s + 1)}
+                className="w-7 h-7 border border-outline-variant/30 flex items-center justify-center hover:bg-surface-container transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm text-on-surface-variant">add</span>
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={handleAdd}
+            disabled={saving}
+            className="bg-primary px-4 py-2 flex items-center gap-1 hover:bg-primary-container transition-colors disabled:opacity-50"
+          >
+            <span className="text-on-primary text-xs font-black tracking-widest font-headline uppercase">
+              {saving ? '...' : 'Add'}
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProgramDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [program, setProgram] = useState(null);
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -38,7 +265,18 @@ export default function ProgramDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function handleDelete() {
+  async function handleDeleteExercise(exerciseRowId) {
+    try {
+      const res = await fetch(`/api/programs/${id}/exercises/${exerciseRowId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
+      setExercises((prev) => prev.filter((e) => e.id !== exerciseRowId));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to remove exercise.');
+    }
+  }
+
+  async function handleDeleteProgram() {
     setDeleting(true);
     try {
       const res = await fetch(`/api/programs/${id}`, { method: 'DELETE' });
@@ -51,6 +289,12 @@ export default function ProgramDetailPage() {
       setConfirmDelete(false);
     }
   }
+
+  function handleExerciseAdded(newEx) {
+    setExercises((prev) => [...prev, newEx]);
+  }
+
+  const existingExerciseIds = new Set(exercises.map((e) => e.exercise_id));
 
   if (loading) {
     return (
@@ -84,75 +328,94 @@ export default function ProgramDetailPage() {
             {program.name}
           </h1>
         </div>
+        <button
+          onClick={() => setEditMode((e) => !e)}
+          className={`w-8 h-8 border flex items-center justify-center transition-colors ${
+            editMode
+              ? 'border-primary bg-primary/10'
+              : 'border-outline-variant/30 hover:bg-surface-container'
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm text-on-surface-variant">
+            {editMode ? 'check' : 'edit'}
+          </span>
+        </button>
       </div>
 
-      {/* Exercise count summary */}
+      {/* Exercise count */}
       <div className="bg-surface-container-low p-3 mb-4">
         <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Exercises</p>
         <p className="text-xl font-black text-white font-body tracking-tighter">{exercises.length}</p>
       </div>
 
+      {/* Edit mode hint */}
+      {editMode && (
+        <p className="text-[10px] text-on-surface-variant font-headline uppercase mb-3">
+          Swipe left on an exercise to remove it
+        </p>
+      )}
+
       {/* Exercise list */}
       {exercises.length === 0 && (
-        <p className="text-on-surface-variant text-sm font-body mb-4">No exercises in this program yet.</p>
+        <p className="text-on-surface-variant text-sm font-body mb-4">No exercises yet.</p>
       )}
-      {exercises.map((ex, i) => {
-        const colors = getMuscleColor(ex.muscle_group);
-        return (
-          <div key={ex.id} className="bg-surface-container-low mb-2 p-3 flex items-center gap-3">
-            <span className="text-[10px] text-on-surface-variant font-bold font-headline w-4">{i + 1}</span>
-            <div className="flex-1">
-              <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
-                {ex.muscle_group || 'General'}
-              </span>
-              <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{ex.name}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[9px] text-on-surface-variant uppercase font-headline">Default</p>
-              <p className="text-sm font-bold text-white font-body">
-                {ex.default_sets}<span className="text-[9px] text-on-surface-variant ml-1">sets</span>
-              </p>
-            </div>
-          </div>
-        );
-      })}
+      {exercises.map((ex, i) => (
+        <ExerciseRow
+          key={ex.id}
+          ex={ex}
+          index={i}
+          editMode={editMode}
+          onDelete={() => handleDeleteExercise(ex.id)}
+        />
+      ))}
 
-      {/* Delete program */}
-      <div className="mt-6">
-        {confirmDelete ? (
-          <div className="bg-surface-container-low p-4">
-            <p className="text-sm text-white font-body mb-4">
-              Delete <span className="font-bold">{program.name}</span>? This cannot be undone.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-error py-3 flex items-center justify-center gap-2 hover:opacity-80 transition-opacity disabled:opacity-50"
-              >
-                <span className="text-on-error text-sm font-black tracking-[0.2em] font-headline uppercase">
-                  {deleting ? 'Deleting...' : 'Delete'}
-                </span>
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                disabled={deleting}
-                className="border border-outline-variant/30 py-3 flex items-center justify-center hover:bg-surface-container transition-colors disabled:opacity-50"
-              >
-                <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">Cancel</span>
-              </button>
+      {/* Add exercise panel — only in edit mode */}
+      {editMode && (
+        <AddExercisePanel
+          programId={id}
+          existingIds={existingExerciseIds}
+          onAdded={handleExerciseAdded}
+        />
+      )}
+
+      {/* Delete program — only in edit mode */}
+      {editMode && (
+        <div className="mt-6">
+          {confirmDelete ? (
+            <div className="bg-surface-container-low p-4">
+              <p className="text-sm text-white font-body mb-4">
+                Delete <span className="font-bold">{program.name}</span>? This cannot be undone.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleDeleteProgram}
+                  disabled={deleting}
+                  className="bg-error py-3 flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  <span className="text-on-error text-sm font-black tracking-[0.2em] font-headline uppercase">
+                    {deleting ? 'Deleting...' : 'Delete'}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="border border-outline-variant/30 py-3 flex items-center justify-center hover:bg-surface-container transition-colors disabled:opacity-50"
+                >
+                  <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">Cancel</span>
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="w-full border border-error/30 py-3 flex items-center justify-center gap-2 hover:bg-error/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-error/70 text-sm">delete</span>
-            <span className="text-error/70 text-sm font-black tracking-[0.2em] font-headline uppercase">Delete Program</span>
-          </button>
-        )}
-      </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full border border-error/30 py-3 flex items-center justify-center gap-2 hover:bg-error/10 transition-colors"
+            >
+              <span className="material-symbols-outlined text-error/70 text-sm">delete</span>
+              <span className="text-error/70 text-sm font-black tracking-[0.2em] font-headline uppercase">Delete Program</span>
+            </button>
+          )}
+        </div>
+      )}
     </main>
   );
 }
