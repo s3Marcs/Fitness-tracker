@@ -186,7 +186,7 @@ function ExerciseCard({ exercise, onDelete, onSave }) {
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
-                className="bg-primary text-on-primary text-xs font-black font-headline tracking-widest uppercase px-4 py-1.5"
+                className="bg-[#0e639c] text-white text-xs font-black font-headline tracking-widest uppercase px-4 py-1.5"
               >
                 SAVE
               </button>
@@ -276,7 +276,7 @@ function AddExerciseTile({ onAdd }) {
       <div className="flex gap-2">
         <button
           onClick={handleAdd}
-          className="bg-primary text-on-primary text-xs font-black font-headline tracking-widest uppercase px-4 py-1.5"
+          className="bg-[#0e639c] text-white text-xs font-black font-headline tracking-widest uppercase px-4 py-1.5"
         >
           ADD
         </button>
