@@ -81,7 +81,7 @@ function useSwipeToDelete(onDelete) {
 // Dashboard tab components
 // ---------------------------------------------------------------------------
 
-function NextWorkoutBanner({ workout }) {
+function NextWorkoutBanner({ workout, todaySessionId }) {
   if (!workout) {
     return (
       <section>
@@ -100,7 +100,7 @@ function NextWorkoutBanner({ workout }) {
   if (workout.status === 'Completed') {
     return (
       <section>
-        <Link to="/workouts" className="block bg-surface-container-low p-4">
+        <Link to={todaySessionId ? `/workouts/${todaySessionId}` : '/workouts'} className="block bg-surface-container-low p-4">
           <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter mb-1 uppercase font-headline">
             Today's workout
           </p>
@@ -435,6 +435,7 @@ function ProgressTab({ data, range, onRangeChange }) {
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [nextWorkout, setNextWorkout] = useState(null);
+  const [todaySessionId, setTodaySessionId] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
   const [weekActivity, setWeekActivity] = useState(STUB_WEEK_ACTIVITY);
@@ -453,6 +454,13 @@ export default function HomePage() {
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length === 7) setWeekActivity(data);
+      })
+      .catch(() => {});
+
+    fetch('/api/sessions/today')
+      .then((r) => r.json())
+      .then((sessions) => {
+        if (sessions && sessions.length > 0) setTodaySessionId(sessions[0].id);
       })
       .catch(() => {});
 
@@ -524,7 +532,7 @@ export default function HomePage() {
 
       {activeTab === 'DASHBOARD' && (
         <>
-          <NextWorkoutBanner workout={nextWorkout} />
+          <NextWorkoutBanner workout={nextWorkout} todaySessionId={todaySessionId} />
           <section className="mt-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-sm font-bold tracking-widest uppercase font-headline">
