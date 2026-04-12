@@ -390,7 +390,7 @@ export default function WorkoutsPage() {
         <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
           {completedSessions.length > 0 ? 'Start another workout' : 'Start a workout'}
         </p>
-        {scheduledWorkout && (
+        {scheduledWorkout && completedSessions.length === 0 && (
           <button
             onClick={() => handleStartAdhoc(scheduledWorkout)}
             disabled={adhocLoading}
