@@ -447,6 +447,7 @@ async def get_session(session_id: str):
     return [
         {
             "id": r.id,
+            "date": r.date,
             "exercise": r.exercise,
             "muscle_group": r.muscle_group,
             "sets": r.sets,
