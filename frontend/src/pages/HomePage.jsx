@@ -251,7 +251,7 @@ function ActivityRow({ log, onDelete }) {
   const ref = useSwipeToDelete(onDelete);
   return (
     <div className="relative mb-3 overflow-hidden">
-      <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
+      <div className="absolute inset-0 bg-[#d93025] flex items-center justify-end pr-4">
         <span className="material-symbols-outlined text-on-error">delete</span>
       </div>
       <div ref={ref} className="relative bg-surface-container-low">
