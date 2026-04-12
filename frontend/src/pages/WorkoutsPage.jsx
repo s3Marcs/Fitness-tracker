@@ -153,7 +153,7 @@ export default function WorkoutsPage() {
   const [adhocLoading, setAdhocLoading] = useState(false);
   const [completedSessions, setCompletedSessions] = useState([]);
   const [scheduledWorkout, setScheduledWorkout] = useState(null);
-  const [scheduledProgramId, setScheduledProgramId] = useState(null);
+  
 
   useEffect(() => {
     let exerciseMap = {};
@@ -176,14 +176,10 @@ export default function WorkoutsPage() {
             return fetch('/api/programs')
               .then((r) => r.json())
               .then((programList) => {
-                if (!schedule || !schedule.routine_id) {
-                  setPrograms(Array.isArray(programList) ? programList : []);
-                  return;
-                }
+                setPrograms(Array.isArray(programList) ? programList : []);
+                if (!schedule || !schedule.routine_id) return;
                 const program = programList.find((p) => p.id === schedule.routine_id);
                 if (program) setScheduledWorkout(program);
-                setPrograms(Array.isArray(programList) ? programList.filter((p) => p.id !== schedule.routine_id) : []);
-                setScheduledProgramId(schedule.routine_id);
                 // Only auto-load the workout if nothing completed today
                 if (schedule.status !== 'Completed') {
                   setScheduledDate(schedule.scheduled_date);
