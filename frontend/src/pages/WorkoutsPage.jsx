@@ -152,6 +152,7 @@ export default function WorkoutsPage() {
   const [programs, setPrograms] = useState([]);
   const [adhocLoading, setAdhocLoading] = useState(false);
   const [completedSessions, setCompletedSessions] = useState([]);
+  const [scheduledWorkout, setScheduledWorkout] = useState(null);
 
   useEffect(() => {
     let exerciseMap = {};
@@ -171,28 +172,28 @@ export default function WorkoutsPage() {
         return fetch('/api/schedule/today')
           .then((r) => r.json())
           .then((schedule) => {
-            if (!schedule || !schedule.routine_id || schedule.status === 'Completed') {
-              return fetch('/api/programs')
-                .then((r) => r.json())
-                .then((list) => setPrograms(Array.isArray(list) ? list : []));
-            }
-            setScheduledDate(schedule.scheduled_date);
-            return fetch(`/api/programs/${schedule.routine_id}/exercises`)
+            return fetch('/api/programs')
               .then((r) => r.json())
-              .then((exList) =>
-                fetch('/api/programs')
-                  .then((r) => r.json())
-                  .then((programList) => {
-                    const program = programList.find((p) => p.id === schedule.routine_id);
-                    setWorkoutName(program?.name ?? "Today's Workout");
-                    setExercises(
-                      Array.isArray(exList)
-                        ? exList.map((ex) => apiExerciseToWorkoutExercise(ex, exerciseMap))
-                        : []
-                    );
-                    setPrograms(Array.isArray(programList) ? programList : []);
-                  })
-              );
+              .then((programList) => {
+                setPrograms(Array.isArray(programList) ? programList : []);
+                if (!schedule || !schedule.routine_id) return;
+                const program = programList.find((p) => p.id === schedule.routine_id);
+                if (program) setScheduledWorkout(program);
+                // Only auto-load the workout if nothing completed today
+                if (schedule.status !== 'Completed') {
+                  setScheduledDate(schedule.scheduled_date);
+                  return fetch(`/api/programs/${schedule.routine_id}/exercises`)
+                    .then((r) => r.json())
+                    .then((exList) => {
+                      setWorkoutName(program?.name ?? "Today's Workout");
+                      setExercises(
+                        Array.isArray(exList)
+                          ? exList.map((ex) => apiExerciseToWorkoutExercise(ex, exerciseMap))
+                          : []
+                      );
+                    });
+                }
+              });
           });
       })
       .catch(() => {})
@@ -367,7 +368,7 @@ export default function WorkoutsPage() {
     );
   }
 
-  // Default view — completed sessions + adhoc picker
+  // Default view — completed sessions + scheduled workout + adhoc picker
   return (
     <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
       <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">WORKOUTS</h1>
@@ -389,7 +390,20 @@ export default function WorkoutsPage() {
         <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
           {completedSessions.length > 0 ? 'Start another workout' : 'Start a workout'}
         </p>
-        {programs.length === 0 && (
+        {scheduledWorkout && (
+          <button
+            onClick={() => handleStartAdhoc(scheduledWorkout)}
+            disabled={adhocLoading}
+            className="w-full bg-surface-container-low p-4 mb-2 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left border-l-2 border-[#0e639c]"
+          >
+            <div>
+              <p className="text-[9px] text-[#0e639c] font-bold uppercase font-headline mb-1">Scheduled for today</p>
+              <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{scheduledWorkout.name}</p>
+            </div>
+            <span className="material-symbols-outlined text-[#0e639c] text-sm">play_arrow</span>
+          </button>
+        )}
+        {programs.length === 0 && !scheduledWorkout && (
           <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
         )}
         {programs.map((program) => (

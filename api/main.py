@@ -436,7 +436,7 @@ async def get_session(session_id: str):
         # Support lookup by session_id or by date for backwards compat
         rows = conn.execute(
             text("""
-                SELECT wl.id, wl.sets, wl.reps, wl.weight_kg, wl.notes,
+                SELECT wl.id, wl.date, wl.sets, wl.reps, wl.weight_kg, wl.notes,
                        e.name as exercise, e.muscle_group
                 FROM workout_log wl
                 JOIN exercises e ON e.id = wl.exercise_id

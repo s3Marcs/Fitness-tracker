@@ -100,20 +100,23 @@ function NextWorkoutBanner({ workout }) {
   if (workout.status === 'Completed') {
     return (
       <section>
-        <div className="bg-surface-container-low p-4">
+        <Link to="/workouts" className="block bg-surface-container-low p-4">
           <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter mb-1 uppercase font-headline">
             Today's workout
           </p>
           <h3 className="text-2xl font-black text-white tracking-tight font-headline uppercase mb-3">
             {workout.name}
           </h3>
-          <div className="flex items-center gap-2 bg-secondary/10 p-3">
-            <span className="material-symbols-outlined text-secondary text-sm">check_circle</span>
-            <span className="text-secondary text-sm font-black tracking-[0.15em] font-headline uppercase">
-              Completed
-            </span>
+          <div className="flex items-center justify-between bg-secondary/10 p-3">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary text-sm">check_circle</span>
+              <span className="text-secondary text-sm font-black tracking-[0.15em] font-headline uppercase">
+                Completed
+              </span>
+            </div>
+            <span className="material-symbols-outlined text-on-surface-variant text-sm">chevron_right</span>
           </div>
-        </div>
+        </Link>
       </section>
     );
   }
