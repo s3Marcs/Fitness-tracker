@@ -59,6 +59,7 @@ def run_migrations():
     migrations = [
         "ALTER TABLE program_exercises ADD COLUMN default_weight_kg REAL NOT NULL DEFAULT 0",
         "ALTER TABLE program_exercises ADD COLUMN default_reps INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE workout_log ADD COLUMN session_id TEXT NOT NULL DEFAULT ''",
     ]
     with engine.connect() as conn:
         conn.execute(text("PRAGMA foreign_keys = ON"))
@@ -67,7 +68,7 @@ def run_migrations():
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
-                pass  # Column already exists — safe to ignore
+                pass
 
 def get_conn():
     conn = engine.connect()
@@ -162,10 +163,7 @@ async def update_exercise(exercise_id: str, payload: dict):
 @app.delete("/api/exercises/{exercise_id}", status_code=204)
 async def delete_exercise(exercise_id: str):
     with get_conn() as conn:
-        conn.execute(
-            text("DELETE FROM exercises WHERE id = :id"),
-            {"id": exercise_id}
-        )
+        conn.execute(text("DELETE FROM exercises WHERE id = :id"), {"id": exercise_id})
         conn.commit()
 
 # --- Programs ---
@@ -201,18 +199,9 @@ async def create_program(payload: dict):
 @app.delete("/api/programs/{program_id}", status_code=204)
 async def delete_program(program_id: str):
     with get_conn() as conn:
-        conn.execute(
-            text("DELETE FROM program_exercises WHERE program_id = :id"),
-            {"id": program_id}
-        )
-        conn.execute(
-            text("UPDATE plans SET program_id = NULL WHERE program_id = :id"),
-            {"id": program_id}
-        )
-        conn.execute(
-            text("DELETE FROM programs WHERE id = :id"),
-            {"id": program_id}
-        )
+        conn.execute(text("DELETE FROM program_exercises WHERE program_id = :id"), {"id": program_id})
+        conn.execute(text("UPDATE plans SET program_id = NULL WHERE program_id = :id"), {"id": program_id})
+        conn.execute(text("DELETE FROM programs WHERE id = :id"), {"id": program_id})
         conn.commit()
 
 # --- Program Exercises ---
@@ -385,20 +374,23 @@ async def get_sessions(limit: int = Query(20, ge=1, le=200)):
     with get_conn() as conn:
         rows = conn.execute(
             text("""
-                SELECT wl.date, wl.day,
+                SELECT session_id,
+                       date,
+                       day,
                        COUNT(*) as exercise_count,
-                       SUM(wl.sets * wl.reps * wl.weight_kg) as total_volume_kg,
+                       SUM(sets * reps * weight_kg) as total_volume_kg,
                        GROUP_CONCAT(DISTINCT e.muscle_group) as muscle_groups
                 FROM workout_log wl
                 JOIN exercises e ON e.id = wl.exercise_id
-                GROUP BY wl.date
-                ORDER BY wl.date DESC
+                GROUP BY session_id
+                ORDER BY date DESC, session_id DESC
                 LIMIT :limit
             """),
             {"limit": limit}
         ).fetchall()
     return [
         {
+            "id": r.session_id if r.session_id else r.date,
             "date": r.date,
             "day": r.day,
             "exercise_count": r.exercise_count,
@@ -414,36 +406,43 @@ async def get_todays_sessions():
     with get_conn() as conn:
         rows = conn.execute(
             text("""
-                SELECT wl.date,
+                SELECT wl.session_id,
+                       wl.date,
                        COUNT(*) as exercise_count,
-                       SUM(wl.sets * wl.reps * wl.weight_kg) as total_volume_kg
+                       SUM(wl.sets * wl.reps * wl.weight_kg) as total_volume_kg,
+                       GROUP_CONCAT(DISTINCT e.muscle_group) as muscle_groups
                 FROM workout_log wl
+                JOIN exercises e ON e.id = wl.exercise_id
                 WHERE wl.date = :date
-                GROUP BY wl.date
+                GROUP BY wl.session_id
+                ORDER BY wl.session_id ASC
             """),
             {"date": today}
         ).fetchall()
     return [
         {
+            "id": r.session_id if r.session_id else r.date,
             "date": r.date,
-            "exercises": r.exercise_count,
+            "exercise_count": r.exercise_count,
             "total_volume_kg": round(r.total_volume_kg or 0, 2),
+            "muscle_groups": r.muscle_groups.split(",") if r.muscle_groups else [],
         }
         for r in rows
     ]
 
-@app.get("/api/sessions/{date}")
-async def get_session(date: str):
+@app.get("/api/sessions/{session_id}")
+async def get_session(session_id: str):
     with get_conn() as conn:
+        # Support lookup by session_id or by date for backwards compat
         rows = conn.execute(
             text("""
                 SELECT wl.id, wl.sets, wl.reps, wl.weight_kg, wl.notes,
                        e.name as exercise, e.muscle_group
                 FROM workout_log wl
                 JOIN exercises e ON e.id = wl.exercise_id
-                WHERE wl.date = :date
+                WHERE wl.session_id = :sid OR (wl.session_id = '' AND wl.date = :sid)
             """),
-            {"date": date}
+            {"sid": session_id}
         ).fetchall()
     return [
         {
@@ -461,15 +460,17 @@ async def get_session(date: str):
 @app.post("/api/sessions", status_code=201)
 async def create_session(session: SessionPayload):
     day_of_week = datetime.strptime(session.date, "%Y-%m-%d").strftime("%A")
+    session_id = str(uuid.uuid4())
     with get_conn() as conn:
         for exercise in session.exercises:
             conn.execute(
                 text("""
-                    INSERT INTO workout_log (id, date, day, exercise_id, sets, reps, weight_kg, notes)
-                    VALUES (:id, :date, :day, :exercise_id, :sets, :reps, :weight_kg, :notes)
+                    INSERT INTO workout_log (id, session_id, date, day, exercise_id, sets, reps, weight_kg, notes)
+                    VALUES (:id, :session_id, :date, :day, :exercise_id, :sets, :reps, :weight_kg, :notes)
                 """),
                 {
                     "id": str(uuid.uuid4()),
+                    "session_id": session_id,
                     "date": session.date,
                     "day": day_of_week,
                     "exercise_id": exercise.exercise_id,
@@ -480,14 +481,21 @@ async def create_session(session: SessionPayload):
                 }
             )
         conn.commit()
-    return {"created": len(session.exercises)}
+    total_volume = sum(e.sets * e.reps * e.weight_kg for e in session.exercises)
+    return {
+        "id": session_id,
+        "date": session.date,
+        "total_volume_kg": round(total_volume, 2),
+        "exercise_count": len(session.exercises)
+    }
 
-@app.delete("/api/sessions/{date}", status_code=204)
-async def delete_session(date: str):
+@app.delete("/api/sessions/{session_id}", status_code=204)
+async def delete_session(session_id: str):
     with get_conn() as conn:
+        # Support delete by session_id or date for backwards compat
         conn.execute(
-            text("DELETE FROM workout_log WHERE date = :date"),
-            {"date": date}
+            text("DELETE FROM workout_log WHERE session_id = :sid OR (session_id = '' AND date = :sid)"),
+            {"sid": session_id}
         )
         conn.commit()
 

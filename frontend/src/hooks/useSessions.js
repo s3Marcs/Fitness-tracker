@@ -11,7 +11,7 @@ function formatDate(dateStr) {
 
 function transformSession(raw) {
   return {
-    id: raw.date,
+    id: raw.id,
     tag: 'STRENGTH',
     name: raw.muscle_groups?.length
       ? raw.muscle_groups.join(' + ')
@@ -23,7 +23,7 @@ function transformSession(raw) {
   };
 }
 
-function transformSessionDetail(dateStr, rawExercises) {
+function transformSessionDetail(sessionId, rawExercises) {
   const totalVolume = rawExercises.reduce(
     (acc, ex) => acc + ex.sets * ex.reps * ex.weight_kg,
     0
@@ -62,8 +62,8 @@ function transformSessionDetail(dateStr, rawExercises) {
   });
 
   return {
-    id: dateStr,
-    date: formatDate(dateStr),
+    id: sessionId,
+    date: formatDate(rawExercises[0]?.date ?? sessionId),
     tag: 'STRENGTH',
     totalVolumeKg: Math.round(totalVolume),
     setsDone: totalSets,
@@ -79,9 +79,9 @@ export async function fetchSessions(limit = 20) {
   return data.map(transformSession);
 }
 
-export async function fetchSessionDetail(dateStr) {
-  const res = await fetch(`${API_BASE}/api/sessions/${dateStr}`);
+export async function fetchSessionDetail(sessionId) {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`);
   if (!res.ok) throw new Error(`fetchSessionDetail failed: ${res.status}`);
   const data = await res.json();
-  return transformSessionDetail(dateStr, data);
+  return transformSessionDetail(sessionId, data);
 }

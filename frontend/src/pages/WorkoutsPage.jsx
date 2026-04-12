@@ -120,6 +120,27 @@ function apiExerciseToWorkoutExercise(ex, exerciseLibrary) {
   };
 }
 
+function CompletedSessionTile({ session, onClick }) {
+  const muscleLabel = session.muscle_groups?.length
+    ? session.muscle_groups.join(' + ')
+    : 'Workout';
+  return (
+    <button
+      onClick={onClick}
+      className="w-full bg-surface-container-low p-4 mb-3 flex items-center justify-between hover:bg-surface-container transition-colors text-left"
+    >
+      <div>
+        <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter uppercase font-headline mb-1">Completed</p>
+        <p className="text-base font-black text-white tracking-tight font-headline uppercase">{muscleLabel}</p>
+        <p className="text-[9px] text-on-surface-variant uppercase font-headline mt-1">
+          {session.exercise_count} exercises · {session.total_volume_kg.toLocaleString()} KG
+        </p>
+      </div>
+      <span className="material-symbols-outlined text-on-surface-variant text-sm">chevron_right</span>
+    </button>
+  );
+}
+
 export default function WorkoutsPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -130,7 +151,7 @@ export default function WorkoutsPage() {
   const [scheduledDate, setScheduledDate] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [adhocLoading, setAdhocLoading] = useState(false);
-  const [completedWorkout, setCompletedWorkout] = useState(null);
+  const [completedSessions, setCompletedSessions] = useState([]);
 
   useEffect(() => {
     let exerciseMap = {};
@@ -145,20 +166,12 @@ export default function WorkoutsPage() {
       .then((r) => r.json())
       .then((sessions) => {
         if (sessions && sessions.length > 0) {
-          const session = sessions[0];
-          setCompletedWorkout({
-            date: session.date,
-            totalVolume: session.total_volume_kg,
-            exercises: session.exercises.length,
-          });
-          return fetch('/api/programs')
-            .then((r) => r.json())
-            .then((list) => setPrograms(Array.isArray(list) ? list : []));
+          setCompletedSessions(sessions);
         }
         return fetch('/api/schedule/today')
           .then((r) => r.json())
           .then((schedule) => {
-            if (!schedule || !schedule.routine_id) {
+            if (!schedule || !schedule.routine_id || schedule.status === 'Completed') {
               return fetch('/api/programs')
                 .then((r) => r.json())
                 .then((list) => setPrograms(Array.isArray(list) ? list : []));
@@ -177,6 +190,7 @@ export default function WorkoutsPage() {
                         ? exList.map((ex) => apiExerciseToWorkoutExercise(ex, exerciseMap))
                         : []
                     );
+                    setPrograms(Array.isArray(programList) ? programList : []);
                   })
               );
           });
@@ -249,17 +263,20 @@ export default function WorkoutsPage() {
       if (!res.ok) throw new Error(`POST /api/sessions failed: ${res.status}`);
 
       const session = await res.json();
-      setCompletedWorkout({
-        date: session.date,
-        totalVolume: session.total_volume_kg,
-        exercises: exerciseRows.length,
-      });
 
+      // Append to completed sessions and clear active workout
+      setCompletedSessions((prev) => [...prev, {
+        id: session.id,
+        date: session.date,
+        exercise_count: session.exercise_count,
+        total_volume_kg: session.total_volume_kg,
+        muscle_groups: [],
+      }]);
       setWorkoutName(null);
       setExercises([]);
       setScheduledDate(null);
 
-      navigate(`/workouts/${date}`);
+      navigate(`/workouts/${session.id}`);
     } catch (err) {
       console.error(err);
       alert('Failed to save session. Check console for details.');
@@ -284,140 +301,109 @@ export default function WorkoutsPage() {
     );
   }
 
-  if (completedWorkout) {
+  // Active workout view
+  if (workoutName) {
     return (
       <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">WORKOUTS</h1>
+        <div className="mb-4">
+          <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-2">WORKOUTS</h1>
+          <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter uppercase font-headline">Active Workout</p>
+          <p className="text-xl font-black text-white tracking-tight font-headline uppercase mt-1">{workoutName}</p>
+        </div>
 
-        <div className="bg-surface-container-low p-4 mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter uppercase font-headline mb-1">Completed</p>
-              <p className="text-xl font-black text-white tracking-tight font-headline uppercase">
-                {completedWorkout.date}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[9px] text-on-surface-variant uppercase font-headline">
-                {completedWorkout.totalVolume.toLocaleString()} KG
-              </p>
-              <p className="text-[9px] text-on-surface-variant uppercase font-headline">
-                {completedWorkout.exercises} exercises
-              </p>
-            </div>
+        <div className="bg-surface-container-low p-3 mb-6 grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Total Volume</p>
+            <p className="text-lg font-black text-white font-body tracking-tighter">
+              {totalVolume.toLocaleString()}<span className="text-[10px] text-secondary ml-1">KG</span>
+            </p>
+          </div>
+          <div>
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Sets Done</p>
+            <p className="text-lg font-black text-white font-body tracking-tighter">
+              {doneSets}<span className="text-[10px] text-on-surface-variant ml-1">/ {totalSets}</span>
+            </p>
+          </div>
+          <div>
+            <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Exercises</p>
+            <p className="text-lg font-black text-white font-body tracking-tighter">{exercises.length}</p>
           </div>
         </div>
 
-        <div>
-          <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
-            Start an ad-hoc workout
-          </p>
-          {programs.length === 0 && (
-            <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
-          )}
-          {programs.map((program) => (
+        {exercises.length === 0 && (
+          <p className="text-on-surface-variant text-sm font-body">No exercises in this program yet.</p>
+        )}
+        {exercises.map((exercise) => (
+          <ExerciseBlock key={exercise.id} exercise={exercise} onUpdateSet={handleUpdateSet} />
+        ))}
+
+        {exercises.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mt-4">
             <button
-              key={program.id}
-              onClick={() => handleStartAdhoc(program)}
-              disabled={adhocLoading}
-              className="w-full bg-surface-container-low p-4 mb-2 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
+              onClick={handleFinish}
+              disabled={submitting}
+              className="bg-emerald-600 py-3 flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors disabled:opacity-50"
             >
-              <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
-              <span className="material-symbols-outlined text-[#0e639c] text-sm">play_arrow</span>
+              <span className="text-white text-sm font-black tracking-[0.2em] font-headline uppercase">
+                {submitting ? 'Saving...' : 'Finish'}
+              </span>
+              <span className="material-symbols-outlined text-white text-sm">check_circle</span>
             </button>
-          ))}
-        </div>
+            <button
+              onClick={() => {
+                setWorkoutName(null);
+                setExercises([]);
+                setScheduledDate(null);
+              }}
+              disabled={submitting}
+              className="border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors disabled:opacity-50"
+            >
+              <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">Cancel</span>
+              <span className="material-symbols-outlined text-on-surface-variant text-sm">close</span>
+            </button>
+          </div>
+        )}
       </main>
     );
   }
 
-  if (!workoutName) {
-    return (
-      <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">WORKOUTS</h1>
-        <div className="bg-surface-container-low p-4 mb-6">
-          <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter uppercase font-headline mb-1">Today</p>
-          <p className="text-on-surface-variant text-sm font-body">No workout scheduled for today.</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
-            Start an ad-hoc workout
-          </p>
-          {programs.length === 0 && (
-            <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
-          )}
-          {programs.map((program) => (
-            <button
-              key={program.id}
-              onClick={() => handleStartAdhoc(program)}
-              disabled={adhocLoading}
-              className="w-full bg-surface-container-low p-4 mb-2 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
-            >
-              <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
-              <span className="material-symbols-outlined text-[#0e639c] text-sm">play_arrow</span>
-            </button>
-          ))}
-        </div>
-      </main>
-    );
-  }
-
+  // Default view — completed sessions + adhoc picker
   return (
     <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
-      <div className="mb-4">
-        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-2">WORKOUTS</h1>
-        <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter uppercase font-headline">Active Workout</p>
-        <p className="text-xl font-black text-white tracking-tight font-headline uppercase mt-1">{workoutName}</p>
-      </div>
+      <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">WORKOUTS</h1>
 
-      <div className="bg-surface-container-low p-3 mb-6 grid grid-cols-3 gap-4">
-        <div>
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Total Volume</p>
-          <p className="text-lg font-black text-white font-body tracking-tighter">
-            {totalVolume.toLocaleString()}<span className="text-[10px] text-secondary ml-1">KG</span>
-          </p>
-        </div>
-        <div>
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Sets Done</p>
-          <p className="text-lg font-black text-white font-body tracking-tighter">
-            {doneSets}<span className="text-[10px] text-on-surface-variant ml-1">/ {totalSets}</span>
-          </p>
-        </div>
-        <div>
-          <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-1">Exercises</p>
-          <p className="text-lg font-black text-white font-body tracking-tighter">{exercises.length}</p>
-        </div>
-      </div>
-
-      {exercises.length === 0 && (
-        <p className="text-on-surface-variant text-sm font-body">No exercises in this program yet.</p>
-      )}
-      {exercises.map((exercise) => (
-        <ExerciseBlock key={exercise.id} exercise={exercise} onUpdateSet={handleUpdateSet} />
-      ))}
-
-      {exercises.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <button
-            onClick={handleFinish}
-            disabled={submitting}
-            className="bg-emerald-600 py-3 flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors disabled:opacity-50"
-          >
-            <span className="text-white text-sm font-black tracking-[0.2em] font-headline uppercase">
-              {submitting ? 'Saving...' : 'Finish'}
-            </span>
-            <span className="material-symbols-outlined text-white text-sm">check_circle</span>
-          </button>
-          <button
-            onClick={() => window.history.back()}
-            disabled={submitting}
-            className="border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors disabled:opacity-50"
-          >
-            <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">Cancel</span>
-            <span className="material-symbols-outlined text-on-surface-variant text-sm">close</span>
-          </button>
+      {completedSessions.length > 0 && (
+        <div className="mb-6">
+          <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">Today</p>
+          {completedSessions.map((session) => (
+            <CompletedSessionTile
+              key={session.id}
+              session={session}
+              onClick={() => navigate(`/workouts/${session.id}`)}
+            />
+          ))}
         </div>
       )}
+
+      <div>
+        <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
+          {completedSessions.length > 0 ? 'Start another workout' : 'Start a workout'}
+        </p>
+        {programs.length === 0 && (
+          <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
+        )}
+        {programs.map((program) => (
+          <button
+            key={program.id}
+            onClick={() => handleStartAdhoc(program)}
+            disabled={adhocLoading}
+            className="w-full bg-surface-container-low p-4 mb-2 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
+          >
+            <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
+            <span className="material-symbols-outlined text-[#0e639c] text-sm">play_arrow</span>
+          </button>
+        ))}
+      </div>
     </main>
   );
 }
