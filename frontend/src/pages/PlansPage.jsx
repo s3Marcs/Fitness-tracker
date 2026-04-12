@@ -23,7 +23,7 @@ function useSwipeToDelete(onDelete) {
 
     function onTouchMove(e) {
       const delta = e.touches[0].clientX - startX.current;
-      if (delta > 0) return; // only left swipe
+      if (delta > 0) return;
       currentX.current = delta;
       el.style.transform = `translateX(${Math.max(delta, -100)}px)`;
     }
@@ -65,11 +65,9 @@ function PlanCard({ plan, programName, onDelete }) {
 
   return (
     <div className="relative mb-3 overflow-hidden">
-      {/* Red delete strip behind */}
       <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
         <span className="material-symbols-outlined text-on-error">delete</span>
       </div>
-      {/* Card */}
       <div
         ref={ref}
         onClick={handleClick}
@@ -103,11 +101,9 @@ function ProgramCard({ program, onDelete }) {
 
   return (
     <div className="relative mb-3 overflow-hidden">
-      {/* Red delete strip behind */}
       <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
         <span className="material-symbols-outlined text-on-error">delete</span>
       </div>
-      {/* Card */}
       <div
         ref={ref}
         onClick={handleClick}
@@ -121,127 +117,185 @@ function ProgramCard({ program, onDelete }) {
   );
 }
 
-function ExerciseRow({ exercise, handleEditExercise, handleDeleteExercise }) {
+function ExerciseCard({ exercise, onDelete, onSave }) {
+  const [isEditing, setIsEditing] = useState(false);
   const [localName, setLocalName] = useState(exercise.name);
   const [localMuscleGroup, setLocalMuscleGroup] = useState(exercise.muscle_group);
-  const { ref, didSwipe } = useSwipeToDelete(() => handleDeleteExercise(exercise.id));
+  const { ref, didSwipe } = useSwipeToDelete(onDelete);
 
-  const handleSave = () => {
-    if (localName !== exercise.name || localMuscleGroup !== exercise.muscle_group) {
-      handleEditExercise(exercise.id, localName, localMuscleGroup);
-    }
-  };
+  function handleClick() {
+    if (didSwipe()) return;
+    setIsEditing(true);
+  }
+
+  function handleSave() {
+    onSave(exercise.id, localName, localMuscleGroup);
+    setIsEditing(false);
+  }
+
+  function handleCancel() {
+    setLocalName(exercise.name);
+    setLocalMuscleGroup(exercise.muscle_group);
+    setIsEditing(false);
+  }
 
   return (
     <div className="relative mb-3 overflow-hidden">
-      {/* Red delete strip behind */}
       <div className="absolute inset-0 bg-error flex items-center justify-end pr-4">
         <span className="material-symbols-outlined text-on-error">delete</span>
       </div>
-      {/* Card */}
       <div
         ref={ref}
+        onClick={!isEditing ? handleClick : undefined}
         className="relative bg-surface-container-low p-4 cursor-pointer hover:bg-surface-container transition-colors"
       >
-        <div className="flex justify-between items-center">
-          <div>
+        {isEditing ? (
+          <div onClick={(e) => e.stopPropagation()}>
             <input
               type="text"
               value={localName}
               onChange={(e) => setLocalName(e.target.value)}
-              onBlur={handleSave}
-              className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-1"
+              className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-2"
             />
             <input
               type="text"
               value={localMuscleGroup}
               onChange={(e) => setLocalMuscleGroup(e.target.value)}
-              onBlur={handleSave}
-              className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full"
+              className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-3"
             />
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                className="bg-primary text-on-primary text-xs font-bold font-headline px-4 py-1.5"
+              >
+                SAVE
+              </button>
+              <button
+                onClick={handleCancel}
+                className="text-on-surface-variant text-xs font-bold font-headline px-4 py-1.5"
+              >
+                CANCEL
+              </button>
+            </div>
           </div>
-          <button onClick={handleSave} className="bg-primary text-on-primary text-sm font-bold px-4 py-2 rounded">
-            Save
-          </button>
-        </div>
+        ) : (
+          <>
+            <h3 className="text-base font-black text-white uppercase font-headline tracking-tight">
+              {exercise.name}
+            </h3>
+            <p className="text-xs text-on-surface-variant font-body mt-0.5">
+              {exercise.muscle_group}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function ExerciseEditor({ handleAddExercise }) {
-  const [exerciseName, setExerciseName] = useState('');
-  const [muscleGroup, setMuscleGroup] = useState('');
+function ExercisesTab() {
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [newName, setNewName] = useState('');
+  const [newMuscleGroup, setNewMuscleGroup] = useState('');
 
   useEffect(() => {
     fetchExercises();
   }, []);
 
-  const fetchExercises = async () => {
+  async function fetchExercises() {
     try {
       const res = await fetch('/api/exercises');
       if (!res.ok) throw new Error(`fetchExercises failed: ${res.status}`);
       const data = await res.json();
       setExercises(data);
-      setLoading(false);
     } catch (err) {
       console.error(err);
       setError('Failed to load exercises.');
+    } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleEditExercise = async (id, updatedName, updatedMuscleGroup) => {
+  async function handleAdd() {
+    if (!newName.trim() || !newMuscleGroup.trim()) return;
+    try {
+      const res = await fetch('/api/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim(), muscle_group: newMuscleGroup.trim() }),
+      });
+      if (!res.ok) throw new Error(`addExercise failed: ${res.status}`);
+      const created = await res.json();
+      setExercises((prev) => [...prev, created]);
+      setNewName('');
+      setNewMuscleGroup('');
+    } catch (err) {
+      console.error(err);
+      setError('Failed to add exercise.');
+    }
+  }
+
+  async function handleSave(id, name, muscleGroup) {
     try {
       const res = await fetch(`/api/exercises/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: updatedName, muscle_group: updatedMuscleGroup }),
+        body: JSON.stringify({ name, muscle_group: muscleGroup }),
       });
       if (!res.ok) throw new Error(`editExercise failed: ${res.status}`);
-      setExercises(exercises.map((ex) => (ex.id === id ? { ...ex, name: updatedName, muscle_group: updatedMuscleGroup } : ex)));
+      setExercises((prev) =>
+        prev.map((ex) => (ex.id === id ? { ...ex, name, muscle_group: muscleGroup } : ex))
+      );
     } catch (err) {
       console.error(err);
-      setError('Failed to edit exercise.');
+      setError('Failed to save exercise.');
     }
-  };
+  }
 
-  const handleDeleteExercise = async (id) => {
+  async function handleDelete(id) {
     try {
       const res = await fetch(`/api/exercises/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`deleteExercise failed: ${res.status}`);
-      setExercises(exercises.filter((ex) => ex.id !== id));
+      setExercises((prev) => prev.filter((ex) => ex.id !== id));
     } catch (err) {
       console.error(err);
       setError('Failed to delete exercise.');
     }
-  };
+  }
 
   return (
-    <div>
-      {error && <p className="text-error text-sm font-body">{error}</p>}
-      <div className="mb-4">
+    <>
+      {error && <p className="text-error text-sm font-body mb-4">{error}</p>}
+
+      {/* Add form at top */}
+      <div className="mb-6">
         <input
           type="text"
-          placeholder="Exercise Name"
-          value={exerciseName}
-          onChange={(e) => setExerciseName(e.target.value)}
-          className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-1"
+          placeholder="Exercise name"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-2 placeholder:text-on-surface-variant/50"
         />
         <input
           type="text"
-          placeholder="Muscle Group"
-          value={muscleGroup}
-          onChange={(e) => setMuscleGroup(e.target.value)}
-          className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-1"
+          placeholder="Muscle group"
+          value={newMuscleGroup}
+          onChange={(e) => setNewMuscleGroup(e.target.value)}
+          className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-2 placeholder:text-on-surface-variant/50"
         />
-        <button onClick={handleAddExercise} className="bg-primary text-on-primary text-sm font-bold px-4 py-2 rounded">
-          Add Exercise
+        <button
+          onClick={handleAdd}
+          className="w-full border border-outline-variant/30 py-3 flex items-center justify-center gap-2 hover:bg-surface-container transition-colors"
+        >
+          <span className="material-symbols-outlined text-on-surface-variant text-sm">add</span>
+          <span className="text-on-surface-variant text-sm font-black tracking-[0.2em] font-headline uppercase">
+            Add Exercise
+          </span>
         </button>
       </div>
+
       {loading ? (
         <p className="text-on-surface-variant text-sm font-body">Loading...</p>
       ) : (
@@ -250,16 +304,16 @@ function ExerciseEditor({ handleAddExercise }) {
             <p className="text-on-surface-variant text-sm font-body mb-4">No exercises yet.</p>
           )}
           {exercises.map((exercise) => (
-            <ExerciseRow
+            <ExerciseCard
               key={exercise.id}
               exercise={exercise}
-              handleEditExercise={handleEditExercise}
-              handleDeleteExercise={handleDeleteExercise}
+              onDelete={() => handleDelete(exercise.id)}
+              onSave={handleSave}
             />
           ))}
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -304,25 +358,6 @@ export default function PlansPage() {
       alert('Failed to delete program.');
     }
   }
-
-  const handleAddExercise = async () => {
-    if (!exerciseName.trim() || !muscleGroup.trim()) return;
-    try {
-      const res = await fetch('/api/exercises', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: exerciseName, muscle_group: muscleGroup }),
-      });
-      if (!res.ok) throw new Error(`addExercise failed: ${res.status}`);
-      const newExercise = await res.json();
-      setExercises([...exercises, newExercise]);
-      setExerciseName('');
-      setMuscleGroup('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to add exercise.');
-    }
-  };
 
   const programMap = Object.fromEntries(programs.map((p) => [p.id, p.name]));
 
@@ -406,11 +441,7 @@ export default function PlansPage() {
         </>
       )}
 
-      {!loading && activeTab === 'EXERCISES' && (
-        <>
-          <ExerciseEditor handleAddExercise={handleAddExercise} />
-        </>
-      )}
+      {!loading && activeTab === 'EXERCISES' && <ExercisesTab />}
     </main>
   );
 }
