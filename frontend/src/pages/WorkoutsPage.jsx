@@ -130,6 +130,7 @@ export default function WorkoutsPage() {
   const [scheduledDate, setScheduledDate] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [adhocLoading, setAdhocLoading] = useState(false);
+  const [completedWorkout, setCompletedWorkout] = useState(null);
 
   useEffect(() => {
     let exerciseMap = {};
@@ -144,9 +145,23 @@ export default function WorkoutsPage() {
       .then((r) => r.json())
       .then((schedule) => {
         if (!schedule || !schedule.routine_id) {
-          return fetch('/api/programs')
+          // Check if there's a completed workout from today
+          return fetch('/api/sessions/today')
             .then((r) => r.json())
-            .then((list) => setPrograms(Array.isArray(list) ? list : []));
+            .then((sessions) => {
+              if (sessions && sessions.length > 0) {
+                // Use the first session as completed workout
+                const session = sessions[0];
+                setCompletedWorkout({
+                  date: session.date,
+                  totalVolume: session.total_volume_kg,
+                  exercises: session.exercises.length
+                });
+              }
+              return fetch('/api/programs')
+                .then((r) => r.json())
+                .then((list) => setPrograms(Array.isArray(list) ? list : []));
+            });
         }
         setScheduledDate(schedule.scheduled_date);
         return fetch(`/api/programs/${schedule.routine_id}/exercises`)
@@ -231,6 +246,20 @@ export default function WorkoutsPage() {
         body: JSON.stringify({ date, exercises: exerciseRows }),
       });
       if (!res.ok) throw new Error(`POST /api/sessions failed: ${res.status}`);
+      
+      // Set the completed workout info
+      const session = await res.json();
+      setCompletedWorkout({
+        date: session.date,
+        totalVolume: session.total_volume_kg,
+        exercises: exerciseRows.length
+      });
+      
+      // Clear the active workout state
+      setWorkoutName(null);
+      setExercises([]);
+      setScheduledDate(null);
+      
       navigate(`/workouts/${date}`);
     } catch (err) {
       console.error(err);
@@ -256,6 +285,57 @@ export default function WorkoutsPage() {
     );
   }
 
+  // If we have a completed workout for today, show it at the top
+  if (completedWorkout) {
+    return (
+      <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
+        <h1 className="text-5xl font-headline font-black tracking-tighter uppercase text-white mb-6">WORKOUTS</h1>
+        
+        {/* Completed Workout Tile */}
+        <div className="bg-surface-container-low p-4 mb-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter uppercase font-headline mb-1">Completed</p>
+              <p className="text-xl font-black text-white tracking-tight font-headline uppercase">
+                {completedWorkout.date}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] text-on-surface-variant uppercase font-headline">
+                {completedWorkout.totalVolume.toLocaleString()} KG
+              </p>
+              <p className="text-[9px] text-on-surface-variant uppercase font-headline">
+                {completedWorkout.exercises} exercises
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Start Ad-hoc Workout */}
+        <div>
+          <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
+            Start an ad-hoc workout
+          </p>
+          {programs.length === 0 && (
+            <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
+          )}
+          {programs.map((program) => (
+            <button
+              key={program.id}
+              onClick={() => handleStartAdhoc(program)}
+              disabled={adhocLoading}
+              className="w-full bg-surface-container-low p-4 mb-2 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
+            >
+              <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
+              <span className="material-symbols-outlined text-[#0e639c] text-sm">play_arrow</span>
+            </button>
+          ))}
+        </div>
+      </main>
+    );
+  }
+
+  // If no workout is scheduled and no completed workout, show the initial state
   if (!workoutName) {
     return (
       <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
@@ -287,6 +367,7 @@ export default function WorkoutsPage() {
     );
   }
 
+  // Show the active workout
   return (
     <main className="pb-24 px-4 max-w-7xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
       <div className="mb-4">
