@@ -385,10 +385,10 @@ function ProgressTab({ data, range, onRangeChange }) {
               <button
                 key={v}
                 onClick={() => setVolumeView(v)}
-                className={`px-2 py-0.5 text-[9px] font-bold uppercase font-headline transition-colors ${
+                className={`px-2 py-0.5 text-[9px] font-bold uppercase font-headline transition-colors rounded ${
                   volumeView === v
-                    ? 'bg-primary/20 text-[#0e639c]'
-                    : 'text-on-surface-variant hover:text-white'
+                    ? 'bg-[#0e639c] text-white'
+                    : 'text-on-surface-variant hover:text-white hover:bg-surface-container-low'
                 }`}
               >
                 {v === 'week' ? 'Weekly' : 'Monthly'}
