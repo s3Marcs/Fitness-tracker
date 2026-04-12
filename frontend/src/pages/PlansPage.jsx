@@ -251,9 +251,12 @@ function AddExerciseTile({ onAdd }) {
         placeholder="Exercise name"
         value={newName}
         onChange={(e) => setNewName(e.target.value)}
-        className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-2 placeholder:text-on-surface-variant/50"
+        className="bg-surface-container border border-outline-variant/30 text-white text-sm font-body px-3 py-2 w-full mb-3 placeholder:text-on-surface-variant/50"
       />
-      <div className="flex flex-wrap gap-1.5 mb-3">
+      <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-2 tracking-widest">
+        Muscle Group
+      </p>
+      <div className="flex flex-wrap gap-1.5 mb-4">
         {muscleGroups.map((mg) => {
           const { bg, text } = getMuscleGroupStyle(mg);
           const selected = newMuscleGroup === mg;
@@ -261,7 +264,9 @@ function AddExerciseTile({ onAdd }) {
             <button
               key={mg}
               onClick={() => setNewMuscleGroup(mg)}
-              className={`text-[9px] font-bold font-headline uppercase px-2 py-1 transition-opacity ${bg} ${text} ${selected ? 'opacity-100 ring-1 ring-white/30' : 'opacity-50'}`}
+              className={`text-[9px] font-bold font-headline uppercase px-2 py-1 transition-opacity ${bg} ${text} ${
+                selected ? 'opacity-100 ring-1 ring-white/30' : 'opacity-40'
+              }`}
             >
               {mg}
             </button>
@@ -290,6 +295,8 @@ function ExercisesTab() {
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filterMuscleGroup, setFilterMuscleGroup] = useState(null);
+  const muscleGroups = Object.keys(MUSCLE_GROUP_STYLES);
 
   useEffect(() => {
     fetchExercises();
@@ -318,7 +325,8 @@ function ExercisesTab() {
       });
       if (!res.ok) throw new Error(`addExercise failed: ${res.status}`);
       const created = await res.json();
-      setExercises((prev) => [...prev, created]);
+      // API only returns {id} — construct full object from what we sent
+      setExercises((prev) => [...prev, { id: created.id, name, muscle_group: muscleGroup }]);
     } catch (err) {
       console.error(err);
       setError('Failed to add exercise.');
@@ -353,18 +361,58 @@ function ExercisesTab() {
     }
   }, []);
 
+  const filteredExercises = filterMuscleGroup
+    ? exercises.filter((ex) => ex.muscle_group === filterMuscleGroup)
+    : exercises;
+
   return (
     <>
       {error && <p className="text-error text-sm font-body mb-4">{error}</p>}
+
       <AddExerciseTile onAdd={handleAdd} />
+
+      {/* Muscle group filter */}
+      <div className="mb-4">
+        <p className="text-[9px] text-on-surface-variant uppercase font-bold font-headline mb-2 tracking-widest">
+          Filter
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setFilterMuscleGroup(null)}
+            className={`text-[9px] font-bold font-headline uppercase px-2 py-1 border transition-opacity ${
+              filterMuscleGroup === null
+                ? 'border-white/30 text-white opacity-100'
+                : 'border-outline-variant/30 text-on-surface-variant opacity-50'
+            }`}
+          >
+            All
+          </button>
+          {muscleGroups.map((mg) => {
+            const { bg, text } = getMuscleGroupStyle(mg);
+            const active = filterMuscleGroup === mg;
+            return (
+              <button
+                key={mg}
+                onClick={() => setFilterMuscleGroup(active ? null : mg)}
+                className={`text-[9px] font-bold font-headline uppercase px-2 py-1 transition-opacity ${bg} ${text} ${
+                  active ? 'opacity-100 ring-1 ring-white/30' : 'opacity-40'
+                }`}
+              >
+                {mg}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {loading ? (
         <p className="text-on-surface-variant text-sm font-body">Loading...</p>
       ) : (
         <>
-          {exercises.length === 0 && (
-            <p className="text-on-surface-variant text-sm font-body mb-4">No exercises yet.</p>
+          {filteredExercises.length === 0 && (
+            <p className="text-on-surface-variant text-sm font-body mb-4">No exercises.</p>
           )}
-          {exercises.map((exercise) => (
+          {filteredExercises.map((exercise) => (
             <ExerciseCard
               key={exercise.id}
               exercise={exercise}
