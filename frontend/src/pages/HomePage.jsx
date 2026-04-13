@@ -385,7 +385,7 @@ function ProgressTab({ data, range, onRangeChange }) {
               <button
                 key={v}
                 onClick={() => setVolumeView(v)}
-                className={`px-2 py-[3px] text-[9px] font-bold uppercase font-headline transition-colors rounded ${
+                className={`px-2 py-[3px] text-[9px] font-bold uppercase font-headline transition-colors rounded leading-none ${
                   volumeView === v
                     ? 'bg-[#0e639c] text-white'
                     : 'text-on-surface-variant hover:text-white hover:bg-surface-container-low'
