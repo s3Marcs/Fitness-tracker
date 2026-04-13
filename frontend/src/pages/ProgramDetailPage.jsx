@@ -263,7 +263,7 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
           >drag_indicator</span>
         </div>
         {/* Swipe zone — right 3/4 of row */}
-        <div ref={swipeRef} className="flex-1 flex items-center gap-3 p-3 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
+        <div className="flex-1 flex items-center gap-3 p-3 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
           <div className="flex-1">
             <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
               {ex.muscle_group || 'General'}
