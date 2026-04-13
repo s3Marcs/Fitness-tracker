@@ -75,6 +75,12 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
 
     let ghost = null;
     let startY = 0;
+    let pendingIndex = null;
+
+    function cleanupGhost() {
+      if (ghost) { ghost.remove(); ghost = null; }
+      if (dragEl.current) { dragEl.current.style.opacity = '1'; }
+    }
 
     function onTouchStart(e) {
       dragIndex.current = index;
@@ -98,16 +104,11 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
       document.body.appendChild(ghost);
 
       dragEl.current.style.opacity = '0.3';
+      pendingIndex = index;
       window.addEventListener('touchend', cleanupGhost, { once: true });
       window.addEventListener('touchcancel', cleanupGhost, { once: true });
       e.stopPropagation();
     }
-    function cleanupGhost() {
-      if (ghost) { ghost.remove(); ghost = null; }
-      if (dragEl.current) { dragEl.current.style.opacity = '1'; }
-    }
-
-    let pendingIndex = null;
 
     function onTouchMove(e) {
       if (dragIndex.current === null) return;
@@ -142,13 +143,14 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
       if (dragEl.current) { dragEl.current.style.opacity = '1'; }
       dragEl.current = null;
       dragIndex.current = null;
+      pendingIndex = null;
       window.removeEventListener('touchend', cleanup);
       window.removeEventListener('touchcancel', cleanup);
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', (e) => { onTouchEnd(); window.removeEventListener('touchend', cleanup); window.removeEventListener('touchcancel', cleanup); });
+    el.addEventListener('touchend', onTouchEnd);
     el.addEventListener('touchcancel', cleanup);
     el._dragCleanup = () => {
       el.removeEventListener('touchstart', onTouchStart);
@@ -179,7 +181,7 @@ function Stepper({ label, value, onDec, onInc, suffix, step = 1 }) {
 }
 
 function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, dragHandleRef }) {
-  const ref = useSwipeToDelete(onDelete);
+  const swipeRef = useSwipeToDelete(onDelete);
   const handleRef = useRef(null);
   const colors = getMuscleColor(ex.muscle_group);
 
@@ -189,6 +191,7 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
     dragHandleRef(el);
     return () => dragHandleRef(null);
   }, [dragHandleRef]);
+
   const [expanded, setExpanded] = useState(false);
   const [sets, setSets] = useState(ex.default_sets);
   const [reps, setReps] = useState(ex.default_reps || 0);
@@ -249,16 +252,19 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
       <div className="absolute inset-0 bg-[#d93025] flex items-center justify-end pr-4">
         <span className="material-symbols-outlined text-on-error">delete</span>
       </div>
-      <div className="relative bg-surface-container-low">
-        <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
+      <div className="relative bg-surface-container-low flex items-stretch">
+        {/* Drag handle — excluded from swipe zone */}
+        <div className="flex items-center pl-3 pr-1">
           <span
             ref={handleRef}
             data-drag-handle
-            className="material-symbols-outlined text-on-surface-variant touch-none cursor-grab select-none flex items-center justify-center"
-            style={{ WebkitUserSelect: 'none', userSelect: 'none', fontSize: '1.5rem', padding: '8px', margin: '-8px', marginRight: '4px' }}
+            className="material-symbols-outlined text-on-surface-variant touch-none cursor-grab select-none"
+            style={{ WebkitUserSelect: 'none', userSelect: 'none', fontSize: '1.5rem', padding: '8px', margin: '-8px' }}
           >drag_indicator</span>
-          <div className="flex-1 flex items-center gap-3">
-            <div ref={ref} className="flex-1 flex items-center gap-3">
+        </div>
+        {/* Swipe zone — right 3/4 of row */}
+        <div ref={swipeRef} className="flex-1 flex items-center gap-3 p-3 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
+          <div className="flex-1">
             <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
               {ex.muscle_group || 'General'}
             </span>
@@ -283,29 +289,27 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
           <span className="material-symbols-outlined text-on-surface-variant text-sm">
             {expanded ? 'expand_less' : 'expand_more'}
           </span>
-            </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-outline-variant/10 pt-3 space-y-3 bg-surface-container-low">
+          <Stepper label="Default sets" value={sets} onDec={() => setSets((s) => Math.max(1, s - 1))} onInc={() => setSets((s) => s + 1)} />
+          <Stepper label="Default reps" value={reps} onDec={() => setReps((r) => Math.max(0, r - 1))} onInc={() => setReps((r) => r + 1)} />
+          <Stepper label="Default weight" value={weight}
+            onDec={() => setWeight((w) => Math.max(0, parseFloat((w - 2.5).toFixed(1))))}
+            onInc={() => setWeight((w) => parseFloat((w + 2.5).toFixed(1)))}
+            suffix="KG" />
+          <div className="flex justify-end">
+            <button onClick={handleSave} disabled={saving}
+              className="bg-emerald-600 px-4 py-2 hover:bg-emerald-700 transition-colors disabled:opacity-50">
+              <span className="text-white text-xs font-black tracking-widest font-headline uppercase">
+                {saving ? '...' : 'Save'}
+              </span>
+            </button>
           </div>
         </div>
-
-        {expanded && (
-          <div className="px-3 pb-3 border-t border-outline-variant/10 pt-3 space-y-3">
-            <Stepper label="Default sets" value={sets} onDec={() => setSets((s) => Math.max(1, s - 1))} onInc={() => setSets((s) => s + 1)} />
-            <Stepper label="Default reps" value={reps} onDec={() => setReps((r) => Math.max(0, r - 1))} onInc={() => setReps((r) => r + 1)} />
-            <Stepper label="Default weight" value={weight}
-              onDec={() => setWeight((w) => Math.max(0, parseFloat((w - 2.5).toFixed(1))))}
-              onInc={() => setWeight((w) => parseFloat((w + 2.5).toFixed(1)))}
-              suffix="KG" />
-            <div className="flex justify-end">
-              <button onClick={handleSave} disabled={saving}
-                className="bg-emerald-600 px-4 py-2 hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                <span className="text-white text-xs font-black tracking-widest font-headline uppercase">
-                  {saving ? '...' : 'Save'}
-                </span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -375,7 +379,6 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
   return (
     <div className="bg-surface-container-low p-4 mt-4">
       <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">Add Exercise</p>
-
       <div className="bg-surface-container border-b border-outline focus-within:border-[#0e639c] transition-colors px-3 py-2 mb-3">
         <input
           type="text"
@@ -385,7 +388,6 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
           className="w-full bg-transparent text-white text-base font-body outline-none placeholder:text-on-surface-variant/40"
         />
       </div>
-
       {search && !selectedId && (
         <div className="mb-3 max-h-48 overflow-y-auto">
           {filtered.length === 0 && (
@@ -405,7 +407,6 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
           })}
         </div>
       )}
-
       {selectedId && (
         <div className="mt-2 space-y-3">
           <Stepper label="Default sets" value={defaultSets} onDec={() => setDefaultSets((s) => Math.max(1, s - 1))} onInc={() => setDefaultSets((s) => s + 1)} />
@@ -498,7 +499,6 @@ export default function ProgramDetailPage() {
   }
 
   const { listRef, getHandleRef } = useDragReorder(exercises, setExercises, handleReorder);
-
   const existingExerciseIds = new Set(exercises.map((e) => e.exercise_id));
 
   if (loading) {
