@@ -21,6 +21,7 @@ function useSwipeToDelete(onDelete) {
   const startX = useRef(0);
   const currentX = useRef(0);
   const swiped = useRef(false);
+  const startY = useRef(0);
   const THRESHOLD = 80;
 
   useEffect(() => {
@@ -28,15 +29,18 @@ function useSwipeToDelete(onDelete) {
     if (!el) return;
     function onTouchStart(e) {
       startX.current = e.touches[0].clientX;
+      startY.current = e.touches[0].clientY;
       currentX.current = 0;
       swiped.current = false;
       el.style.transition = 'none';
     }
     function onTouchMove(e) {
-      const delta = e.touches[0].clientX - startX.current;
-      if (delta > 0) return;
-      currentX.current = delta;
-      el.style.transform = `translateX(${Math.max(delta, -100)}px)`;
+      const deltaX = e.touches[0].clientX - startX.current;
+      const deltaY = Math.abs(e.touches[0].clientY - startY.current);
+      if (deltaY > Math.abs(deltaX)) { currentX.current = 0; return; }
+      if (deltaX > 0) return;
+      currentX.current = deltaX;
+      el.style.transform = `translateX(${Math.max(deltaX, -100)}px)`;
     }
     function onTouchEnd() {
       if (currentX.current < -THRESHOLD) {
@@ -254,7 +258,7 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
       </div>
       <div ref={swipeRef} className="relative bg-surface-container-low flex flex-col">
         <div className="flex items-stretch">
-          <div className="flex items-center pl-3 pr-1">
+          <div className="flex items-center pl-3 pr-1 touch-none">
             <span
               ref={handleRef}
               data-drag-handle
