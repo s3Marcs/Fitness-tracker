@@ -137,7 +137,15 @@ function Stepper({ label, value, onDec, onInc, suffix, step = 1 }) {
 
 function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, dragHandleRef }) {
   const ref = useSwipeToDelete(onDelete);
+  const handleRef = useRef(null);
   const colors = getMuscleColor(ex.muscle_group);
+
+  useEffect(() => {
+    const el = handleRef.current;
+    if (!el || !dragHandleRef) return;
+    dragHandleRef(el);
+    return () => dragHandleRef(null);
+  }, [dragHandleRef]);
   const [expanded, setExpanded] = useState(false);
   const [sets, setSets] = useState(ex.default_sets);
   const [reps, setReps] = useState(ex.default_reps || 0);
@@ -201,8 +209,9 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
       <div ref={ref} className="relative bg-surface-container-low">
         <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
           <span
-            ref={dragHandleRef || null}
-            className="material-symbols-outlined text-on-surface-variant text-sm mr-1 touch-none cursor-grab"
+            ref={handleRef}
+            className="material-symbols-outlined text-on-surface-variant text-sm mr-1 touch-none cursor-grab select-none"
+            style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
           >drag_indicator</span>
           <div className="flex-1">
             <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
