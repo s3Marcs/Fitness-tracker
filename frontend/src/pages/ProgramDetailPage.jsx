@@ -98,18 +98,20 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
       document.body.appendChild(ghost);
 
       dragEl.current.style.opacity = '0.3';
+      window.addEventListener('touchend', cleanupGhost, { once: true });
+      window.addEventListener('touchcancel', cleanupGhost, { once: true });
       e.stopPropagation();
+    }
+    function cleanupGhost() {
+      if (ghost) { ghost.remove(); ghost = null; }
+      if (dragEl.current) { dragEl.current.style.opacity = '1'; }
     }
 
     function onTouchMove(e) {
       if (dragIndex.current === null) return;
       e.preventDefault();
       const touch = e.touches[0];
-
-      if (ghost) {
-        ghost.style.top = (touch.clientY - startY) + 'px';
-      }
-
+      if (ghost) ghost.style.top = (touch.clientY - startY) + 'px';
       const list = listRef.current;
       if (!list) return;
       const rows = [...list.querySelectorAll('[data-exercise-row]')];
@@ -126,27 +128,32 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
         setExercises(reordered);
       }
     }
-
     function onTouchEnd() {
-      if (ghost) {
-        ghost.remove();
-        ghost = null;
-      }
-      if (dragEl.current) {
-        dragEl.current.style.opacity = '1';
-      }
+      cleanupGhost();
       dragEl.current = null;
       onReorderComplete();
       dragIndex.current = null;
     }
 
+    function cleanup() {
+      if (ghost) { ghost.remove(); ghost = null; }
+      if (dragEl.current) { dragEl.current.style.opacity = '1'; }
+      dragEl.current = null;
+      dragIndex.current = null;
+      window.removeEventListener('touchend', cleanup);
+      window.removeEventListener('touchcancel', cleanup);
+    }
+
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchend', (e) => { onTouchEnd(); window.removeEventListener('touchend', cleanup); window.removeEventListener('touchcancel', cleanup); });
+    el.addEventListener('touchcancel', cleanup);
     el._dragCleanup = () => {
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', cleanup);
+      cleanup();
     };
   };
 
