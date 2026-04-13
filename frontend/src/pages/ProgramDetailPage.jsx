@@ -27,6 +27,7 @@ function useSwipeToDelete(onDelete) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    
     function onTouchStart(e) {
       if (e.target.closest('[data-drag-handle]')) {
         startX.current = null;
@@ -38,6 +39,7 @@ function useSwipeToDelete(onDelete) {
       swiped.current = false;
       el.style.transition = 'none';
     }
+    
     function onTouchMove(e) {
       if (startX.current === null) return;
       const deltaX = e.touches[0].clientX - startX.current;
@@ -47,6 +49,7 @@ function useSwipeToDelete(onDelete) {
       currentX.current = deltaX;
       el.style.transform = `translateX(${Math.max(deltaX, -100)}px)`;
     }
+    
     function onTouchEnd() {
       if (startX.current === null) return;
       if (currentX.current < -THRESHOLD) {
@@ -59,15 +62,22 @@ function useSwipeToDelete(onDelete) {
         el.style.transform = 'translateX(0)';
       }
     }
+    
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: true });
     el.addEventListener('touchend', onTouchEnd);
+    
     return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
+      // Fixed: Proper cleanup of all event listeners
+      try {
+        el.removeEventListener('touchstart', onTouchStart);
+        el.removeEventListener('touchmove', onTouchMove);
+        el.removeEventListener('touchend', onTouchEnd);
+      } catch (e) {
+        // Silent error handling for cleanup
+      }
     };
-  }, [onDelete]);
+  }, [onDelete, ref]); // Fixed: Added ref to dependency array
 
   return ref;
 }
@@ -458,7 +468,9 @@ export default function ProgramDetailPage() {
         setProgram(prog);
         setExercises(Array.isArray(exList) ? exList : []);
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error('Failed to load program:', err);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
