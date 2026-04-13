@@ -73,22 +73,43 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
     if (!el) return;
     el._dragCleanup?.();
 
+    let ghost = null;
+    let startY = 0;
+
     function onTouchStart(e) {
       dragIndex.current = index;
       dragEl.current = el.closest('[data-exercise-row]');
-      if (dragEl.current) {
-          dragEl.current.style.opacity = '0.9';
-          dragEl.current.style.transform = 'scale(1.03)';
-          dragEl.current.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)';
-          dragEl.current.style.zIndex = '10';
-          dragEl.current.style.position = 'relative';
-        }
+      if (!dragEl.current) return;
+
+      const rect = dragEl.current.getBoundingClientRect();
+      startY = e.touches[0].clientY - rect.top;
+
+      ghost = dragEl.current.cloneNode(true);
+      ghost.style.position = 'fixed';
+      ghost.style.left = rect.left + 'px';
+      ghost.style.top = rect.top + 'px';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.opacity = '0.95';
+      ghost.style.transform = 'scale(1.03)';
+      ghost.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+      ghost.style.zIndex = '1000';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.transition = 'none';
+      document.body.appendChild(ghost);
+
+      dragEl.current.style.opacity = '0.3';
       e.stopPropagation();
     }
+
     function onTouchMove(e) {
       if (dragIndex.current === null) return;
       e.preventDefault();
       const touch = e.touches[0];
+
+      if (ghost) {
+        ghost.style.top = (touch.clientY - startY) + 'px';
+      }
+
       const list = listRef.current;
       if (!list) return;
       const rows = [...list.querySelectorAll('[data-exercise-row]')];
@@ -105,12 +126,14 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
         setExercises(reordered);
       }
     }
+
     function onTouchEnd() {
+      if (ghost) {
+        ghost.remove();
+        ghost = null;
+      }
       if (dragEl.current) {
         dragEl.current.style.opacity = '1';
-        dragEl.current.style.transform = '';
-        dragEl.current.style.boxShadow = '';
-        dragEl.current.style.zIndex = '';
       }
       dragEl.current = null;
       onReorderComplete();
