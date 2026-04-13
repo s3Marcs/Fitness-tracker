@@ -28,6 +28,10 @@ function useSwipeToDelete(onDelete) {
     const el = ref.current;
     if (!el) return;
     function onTouchStart(e) {
+      if (e.target.closest('[data-drag-handle]')) {
+        startX.current = null;
+        return;
+      }
       startX.current = e.touches[0].clientX;
       startY.current = e.touches[0].clientY;
       currentX.current = 0;
@@ -35,6 +39,7 @@ function useSwipeToDelete(onDelete) {
       el.style.transition = 'none';
     }
     function onTouchMove(e) {
+      if (startX.current === null) return;
       const deltaX = e.touches[0].clientX - startX.current;
       const deltaY = Math.abs(e.touches[0].clientY - startY.current);
       if (deltaY > Math.abs(deltaX)) { currentX.current = 0; return; }
@@ -43,6 +48,7 @@ function useSwipeToDelete(onDelete) {
       el.style.transform = `translateX(${Math.max(deltaX, -100)}px)`;
     }
     function onTouchEnd() {
+      if (startX.current === null) return;
       if (currentX.current < -THRESHOLD) {
         swiped.current = true;
         el.style.transition = 'transform 0.2s ease';
