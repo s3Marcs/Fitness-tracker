@@ -66,45 +66,57 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
   const listRef = useRef(null);
   const dragIndex = useRef(null);
   const dragEl = useRef(null);
+  const exercisesRef = useRef(exercises);
+  useEffect(() => { exercisesRef.current = exercises; }, [exercises]);
 
-  function getHandlers(index) {
-    return {
-      onTouchStart: (e) => {
-        dragIndex.current = index;
-        dragEl.current = e.currentTarget.closest('[data-exercise-row]');
-        if (dragEl.current) dragEl.current.style.opacity = '0.5';
-        e.stopPropagation();
-      },
-      onTouchMove: (e) => {
-        if (dragIndex.current === null) return;
-        const touch = e.touches[0];
-        const list = listRef.current;
-        if (!list) return;
-        const rows = [...list.querySelectorAll('[data-exercise-row]')];
-        let newIndex = dragIndex.current;
-        rows.forEach((row, i) => {
-          const rect = row.getBoundingClientRect();
-          if (touch.clientY > rect.top && touch.clientY < rect.bottom) newIndex = i;
-        });
-        if (newIndex !== dragIndex.current) {
-          const reordered = [...exercises];
-          const [moved] = reordered.splice(dragIndex.current, 1);
-          reordered.splice(newIndex, 0, moved);
-          dragIndex.current = newIndex;
-          setExercises(reordered);
-        }
-        e.preventDefault();
-      },
-      onTouchEnd: () => {
-        if (dragEl.current) dragEl.current.style.opacity = '1';
-        dragEl.current = null;
-        onReorderComplete();
-        dragIndex.current = null;
-      },
+  const getHandleRef = (index) => (el) => {
+    if (!el) return;
+    el._dragCleanup?.();
+
+    function onTouchStart(e) {
+      dragIndex.current = index;
+      dragEl.current = el.closest('[data-exercise-row]');
+      if (dragEl.current) dragEl.current.style.opacity = '0.5';
+      e.stopPropagation();
+    }
+    function onTouchMove(e) {
+      if (dragIndex.current === null) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const list = listRef.current;
+      if (!list) return;
+      const rows = [...list.querySelectorAll('[data-exercise-row]')];
+      let newIndex = dragIndex.current;
+      rows.forEach((row, i) => {
+        const rect = row.getBoundingClientRect();
+        if (touch.clientY > rect.top && touch.clientY < rect.bottom) newIndex = i;
+      });
+      if (newIndex !== dragIndex.current) {
+        const reordered = [...exercisesRef.current];
+        const [moved] = reordered.splice(dragIndex.current, 1);
+        reordered.splice(newIndex, 0, moved);
+        dragIndex.current = newIndex;
+        setExercises(reordered);
+      }
+    }
+    function onTouchEnd() {
+      if (dragEl.current) dragEl.current.style.opacity = '1';
+      dragEl.current = null;
+      onReorderComplete();
+      dragIndex.current = null;
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    el._dragCleanup = () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
     };
-  }
+  };
 
-  return { listRef, getHandlers };
+  return { listRef, getHandleRef };
 }
 
 function Stepper({ label, value, onDec, onInc, suffix, step = 1 }) {
@@ -123,7 +135,7 @@ function Stepper({ label, value, onDec, onInc, suffix, step = 1 }) {
   );
 }
 
-function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, dragHandlers }) {
+function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, dragHandleRef }) {
   const ref = useSwipeToDelete(onDelete);
   const colors = getMuscleColor(ex.muscle_group);
   const [expanded, setExpanded] = useState(false);
@@ -189,8 +201,8 @@ function ExerciseRow({ ex, index, programId, editMode, onDelete, onUpdated, drag
       <div ref={ref} className="relative bg-surface-container-low">
         <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded((e) => !e)}>
           <span
+            ref={dragHandleRef || null}
             className="material-symbols-outlined text-on-surface-variant text-sm mr-1 touch-none cursor-grab"
-            {...(dragHandlers || {})}
           >drag_indicator</span>
           <div className="flex-1">
             <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
@@ -429,7 +441,7 @@ export default function ProgramDetailPage() {
     }
   }
 
-  const { listRef, getHandlers } = useDragReorder(exercises, setExercises, handleReorder);
+  const { listRef, getHandleRef } = useDragReorder(exercises, setExercises, handleReorder);
 
   const existingExerciseIds = new Set(exercises.map((e) => e.exercise_id));
 
@@ -493,7 +505,7 @@ export default function ProgramDetailPage() {
               index={i}
               programId={id}
               editMode={editMode}
-              dragHandlers={editMode ? getHandlers(i) : null}
+              dragHandleRef={editMode ? getHandleRef(i) : null}
               onDelete={() => handleDeleteExercise(ex.id)}
               onUpdated={handleExerciseUpdated}
             />
