@@ -123,6 +123,9 @@ class ProgramExerciseUpdateInput(BaseModel):
     default_weight_kg: float = 0
     default_reps: int = 0
 
+class ExerciseReorderInput(BaseModel):
+    order: list[str]  # list of program_exercise ids in new order
+
 # --- Health ---
 
 @app.get("/health")
@@ -293,6 +296,17 @@ async def update_program_exercise(program_id: str, exercise_id: str, payload: Pr
         conn.commit()
     return {"ok": True}
 
+@app.patch("/api/programs/{program_id}/exercises/reorder", status_code=200)
+async def reorder_program_exercises(program_id: str, payload: ExerciseReorderInput):
+    with get_conn() as conn:
+        for i, exercise_id in enumerate(payload.order):
+            conn.execute(
+                text('UPDATE program_exercises SET "order" = :order WHERE id = :id AND program_id = :program_id'),
+                {"order": i, "id": exercise_id, "program_id": program_id}
+            )
+        conn.commit()
+    return {"ok": True}
+    
 @app.delete("/api/programs/{program_id}/exercises/{exercise_id}", status_code=204)
 async def delete_program_exercise(program_id: str, exercise_id: str):
     with get_conn() as conn:
