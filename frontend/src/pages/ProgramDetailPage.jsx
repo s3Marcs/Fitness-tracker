@@ -405,7 +405,7 @@ function AddExercisePanel({ programId, existingIds, onAdded }) {
           {filtered.map((ex) => {
             const colors = getMuscleColor(ex.muscle_group);
             return (
-              <button key={ex.id} onClick={() => { setSelectedId(ex.id); setSearch(ex.name); }}
+              <button key={ex.id} onClick={() => { setSelectedId(ex.id); setSearch(''); }}
                 className="w-full text-left p-2 hover:bg-surface-container transition-colors flex items-center gap-2">
                 <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase font-headline`}>
                   {ex.muscle_group || 'General'}
