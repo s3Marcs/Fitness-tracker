@@ -433,28 +433,19 @@ export default function WorkoutsPage() {
               className="w-full bg-surface-container-low p-4 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
             >
               <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStartAdhoc(program);
-              }}
-              disabled={adhocLoading}
-              className="bg-emerald-600 text-white p-2 hover:bg-emerald-700 transition-colors rounded"
-            >
-              <span className="material-symbols-outlined text-sm">play_arrow</span>
-            </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartAdhoc(program);
+                }}
+                disabled={adhocLoading}
+                className="bg-emerald-600 text-white p-2 hover:bg-emerald-700 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">play_arrow</span>
+              </button>
             </button>
             {showProgramExercises === program.id && (
               <div className="bg-surface-container p-4 mt-2 mb-4">
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-lg font-black text-white uppercase font-headline tracking-tight">Program Exercises</h3>
-                  <button 
-                    onClick={() => setShowProgramExercises(null)}
-                    className="text-on-surface-variant hover:text-white"
-                  >
-                    <span className="material-symbols-outlined">close</span>
-                  </button>
-                </div>
                 {programExercises.length > 0 ? (
                   <div className="space-y-3">
                     {programExercises.map((exercise, index) => (
