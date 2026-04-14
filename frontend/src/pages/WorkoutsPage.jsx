@@ -422,7 +422,7 @@ export default function WorkoutsPage() {
         {programs.length === 0 && !scheduledWorkout && (
           <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
         )}
-        {programs.map((program) => (
+{programs.map((program) => (
           <div key={program.id} className="mb-2">
             <button
               onClick={(e) => {
@@ -467,22 +467,6 @@ export default function WorkoutsPage() {
                         </div>
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <p className="text-on-surface-variant">No exercises found for this program.</p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-                  </div>
-                ) : (
-                  <p className="text-on-surface-variant">No exercises found for this program.</p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
                   </div>
                 ) : (
                   <p className="text-on-surface-variant">No exercises found for this program.</p>
