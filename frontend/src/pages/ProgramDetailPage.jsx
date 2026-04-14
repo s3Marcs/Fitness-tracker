@@ -661,7 +661,7 @@ export default function ProgramDetailPage() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={handleDeleteProgram} disabled={deleting}
-                  className="bg-error py-3 flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-50">
+                  className="bg-[#d93025] py-3 flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-50">
                   <span className="text-on-error text-sm font-black tracking-[0.2em] font-headline uppercase">
                     {deleting ? 'Deleting...' : 'Delete'}
                   </span>
