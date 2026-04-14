@@ -164,8 +164,13 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
       dragEl.current = null;
       dragIndex.current = null;
       pendingIndex = null;
-      window.removeEventListener('touchend', cleanup);
-      window.removeEventListener('touchcancel', cleanup);
+      // Fixed: Proper cleanup of window event listeners with try/catch
+      try {
+        window.removeEventListener('touchend', cleanup);
+        window.removeEventListener('touchcancel', cleanup);
+      } catch (e) {
+        // Silent error handling for cleanup
+      }
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -173,10 +178,15 @@ function useDragReorder(exercises, setExercises, onReorderComplete) {
     el.addEventListener('touchend', onTouchEnd);
     el.addEventListener('touchcancel', cleanup);
     el._dragCleanup = () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-      el.removeEventListener('touchcancel', cleanup);
+      // Fixed: Proper cleanup of element event listeners with try/catch
+      try {
+        el.removeEventListener('touchstart', onTouchStart);
+        el.removeEventListener('touchmove', onTouchMove);
+        el.removeEventListener('touchend', onTouchEnd);
+        el.removeEventListener('touchcancel', cleanup);
+      } catch (e) {
+        // Silent error handling for cleanup
+      }
       cleanup();
     };
   };
