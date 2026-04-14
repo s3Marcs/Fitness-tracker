@@ -437,16 +437,16 @@ export default function WorkoutsPage() {
               className="w-full bg-surface-container-low p-4 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
             >
               <p className="text-base font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStartAdhoc(program);
-                }}
-                disabled={adhocLoading}
-                className="bg-emerald-600 text-white p-2 hover:bg-emerald-700 transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm">play_arrow</span>
-              </button>
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    handleStartAdhoc(program);
+  }}
+  disabled={adhocLoading}
+  className="bg-emerald-600 text-white w-12 h-12 flex items-center justify-center hover:bg-emerald-700 transition-colors font-bold"
+>
+  GO
+</button>
             </button>
             {showProgramExercises === program.id && (
               <div className="bg-surface-container p-4 mt-0 mb-4">
