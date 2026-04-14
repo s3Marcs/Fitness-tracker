@@ -480,46 +480,6 @@ export default function WorkoutsPage() {
             )}
           </div>
         ))}
-        
-        {showProgramExercises && (
-          <div className="bg-surface-container p-4 mt-4 mb-6">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-black text-white uppercase font-headline tracking-tight">Program Exercises</h3>
-              <button 
-                onClick={() => setShowProgramExercises(null)}
-                className="text-on-surface-variant hover:text-white"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            {programExercises.length > 0 ? (
-              <div className="space-y-3">
-                {programExercises.map((exercise, index) => {
-                  const colors = getMuscleColor(exercise.muscle_group || 'General');
-                  return (
-                    <div key={index} className="bg-surface-container-low p-3 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className={`${colors.bg} ${colors.text} text-[9px] font-bold px-1.5 py-0.5 uppercase mb-1 inline-block font-headline`}>
-                            {exercise.muscle_group || 'General'}
-                          </span>
-                          <h4 className="text-base font-black text-white uppercase font-headline tracking-tight">{exercise.name}</h4>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-on-surface-variant">Sets: {exercise.default_sets || 3}</p>
-                          <p className="text-xs text-on-surface-variant">Reps: {exercise.default_reps || 10}</p>
-                          <p className="text-xs text-on-surface-variant">Weight: {exercise.default_weight_kg || 0} kg</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-on-surface-variant">No exercises found for this program.</p>
-            )}
-          </div>
-        )}
       </div>
     </main>
   );
