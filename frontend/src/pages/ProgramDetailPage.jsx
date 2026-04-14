@@ -18,7 +18,7 @@ function getMuscleColor(mg) {
 
 function useSwipeToDelete(onDelete) {
   const ref = useRef(null);
-  const startX = useRef(0);
+  const startX = useRef(null);
   const currentX = useRef(0);
   const swiped = useRef(false);
   const startY = useRef(0);
@@ -81,6 +81,8 @@ function useSwipeToDelete(onDelete) {
         el.style.transition = 'transform 0.2s ease';
         el.style.transform = 'translateX(0)';
       }
+      // Reset startX after processing to prevent carryover issues
+      startX.current = null;
     }
     
     el.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -97,7 +99,7 @@ function useSwipeToDelete(onDelete) {
         // Silent error handling for cleanup
       }
     };
-  }, [onDelete, ref]); // Fixed: Added ref to dependency array
+  }, [onDelete, ref]);
 
   return ref;
 }
