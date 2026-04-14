@@ -16,6 +16,50 @@ function getMuscleColor(muscleGroup) {
   return MUSCLE_COLORS[muscleGroup] ?? DEFAULT_MUSCLE_COLOR;
 }
 
+function NextWorkoutBanner({ workout }) {
+  if (!workout) {
+    return null;
+  }
+
+  const navigate = useNavigate();
+
+  return (
+    <div className="bg-surface-container-low p-4">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <p className="text-[10px] text-[#0e639c] font-bold tracking-tighter mb-1 uppercase font-headline">
+            Next workout
+          </p>
+          <h3 className="text-2xl font-black text-white tracking-tight font-headline uppercase">
+            {workout.name}
+          </h3>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-surface-container p-3 border-l-2 border-secondary">
+          <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Day</p>
+          <p className="text-lg font-bold text-white tracking-tight font-body">{workout.day}</p>
+        </div>
+        <div className="bg-surface-container p-3 border-l-2 border-tertiary">
+          <p className="text-[9px] text-on-surface-variant uppercase font-bold mb-1 font-headline">Program</p>
+          <p className="text-lg font-bold text-white tracking-tight font-body">{workout.program ?? '—'}</p>
+        </div>
+      </div>
+      <button
+        onClick={() => navigate('/workouts')}
+        className="w-full bg-emerald-600 py-3 flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors group"
+      >
+        <span className="text-white text-sm font-black tracking-[0.2em] font-headline uppercase">
+          Start Workout
+        </span>
+        <span className="material-symbols-outlined text-white text-sm transition-transform group-active:translate-x-1">
+          play_arrow
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function SetRow({ set, setIndex, onUpdate }) {
   return (
     <div className={`flex items-center gap-3 py-2 border-b border-outline-variant/10 ${set.done ? 'opacity-50' : ''}`}>
@@ -402,23 +446,11 @@ export default function WorkoutsPage() {
         </div>
       )}
 
+      <section className="mb-6">
+        <NextWorkoutBanner workout={scheduledWorkout} />
+      </section>
+
       <div>
-        <p className="text-[10px] text-on-surface-variant uppercase font-bold font-headline mb-3">
-          {completedSessions.length > 0 ? 'Start another workout' : 'Start a workout'}
-        </p>
-        {scheduledWorkout && completedSessions.length === 0 && (
-          <button
-            onClick={() => handleStartAdhoc(scheduledWorkout)}
-            disabled={adhocLoading}
-            className="w-full bg-surface-container-low p-4 mb-2 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left border-l-2 border-[#0e639c]"
-          >
-            <div>
-              <p className="text-[9px] text-[#0e639c] font-bold uppercase font-headline mb-1">Scheduled for today</p>
-              <p className="text-sm font-black text-white uppercase font-headline tracking-tight">{scheduledWorkout.name}</p>
-            </div>
-            <span className="material-symbols-outlined text-[#0e639c] text-sm">play_arrow</span>
-          </button>
-        )}
         {programs.length === 0 && !scheduledWorkout && (
           <p className="text-on-surface-variant text-sm font-body">No programs found. Create one in Plans first.</p>
         )}
@@ -434,7 +466,7 @@ export default function WorkoutsPage() {
                 }
               }}
               disabled={adhocLoading}
-              className="w-full bg-surface-container-low p-4 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left"
+              className="w-full bg-surface-container-low p-4 flex items-center justify-between hover:bg-surface-container transition-colors disabled:opacity-50 text-left border-l-2 border-[#0e639c]"
             >
               <p className="text-base font-black text-white uppercase font-headline tracking-tight">{program.name}</p>
 <button
