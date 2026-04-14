@@ -483,6 +483,14 @@ export default function WorkoutsPage() {
             )}
           </div>
         ))}
+                  </div>
+                ) : (
+                  <p className="text-on-surface-variant">No exercises found for this program.</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
         
         {showProgramExercises && (
           <div className="bg-surface-container p-4 mt-4 mb-6">
